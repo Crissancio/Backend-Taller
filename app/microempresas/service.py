@@ -66,9 +66,9 @@ def actualizar_microempresa(db: Session, id_microempresa: int, data):
     return micro
 
 def eliminar_microempresa(db: Session, id_microempresa: int):
-    micro = db.query(models.Microempresa).filter_by(id_microempresa=id_microempresa).first()
+    micro = db.query(models.Microempresa).filter_by(id_microempresa=id_microempresa, estado=True).first()
     if not micro:
         return False
-    db.delete(micro)
+    micro.estado = False
     db.commit()
     return True
