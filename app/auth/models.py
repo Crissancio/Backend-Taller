@@ -5,6 +5,5 @@ from app.database.base import Base
 
 class SuperAdmin(Base):
     __tablename__ = "super_admin"
-    id_superadmin = Column(Integer, primary_key=True, index=True)
-    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"))
-    usuario = relationship("Usuario", backref="superadmin")  # SOLO relación, no import directo
+    id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), primary_key=True)
+    usuario = relationship("Usuario", back_populates="super_admin")
