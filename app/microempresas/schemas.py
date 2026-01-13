@@ -35,3 +35,11 @@ class SuscripcionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class MicroempresaUpdate(BaseModel):
+    nombre: Optional[str] = None
+    nit: Optional[str] = None
+    direccion: Optional[str] = None
+    telefono: Optional[str] = None
+    moneda: Optional[str] = None

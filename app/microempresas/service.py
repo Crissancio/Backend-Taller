@@ -50,3 +50,25 @@ def suscribir_empresa(db: Session, id_microempresa: int, id_plan: int):
         "fecha_fin": suscripcion.fecha_fin,
         "estado": suscripcion.estado
     }
+
+
+def obtener_microempresa(db: Session, id_microempresa: int):
+    return db.query(models.Microempresa).filter_by(id_microempresa=id_microempresa).first()
+
+def actualizar_microempresa(db: Session, id_microempresa: int, data):
+    micro = db.query(models.Microempresa).filter_by(id_microempresa=id_microempresa).first()
+    if not micro:
+        return None
+    for field, value in data.dict(exclude_unset=True).items():
+        setattr(micro, field, value)
+    db.commit()
+    db.refresh(micro)
+    return micro
+
+def eliminar_microempresa(db: Session, id_microempresa: int):
+    micro = db.query(models.Microempresa).filter_by(id_microempresa=id_microempresa).first()
+    if not micro:
+        return False
+    db.delete(micro)
+    db.commit()
+    return True
