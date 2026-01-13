@@ -1,3 +1,17 @@
+# ---------- CREAR USUARIO BASE (sin rol) ----------
+def crear_usuario_base(db: Session, data):
+    """Crea solo un usuario base, sin rol asociado"""
+    if get_user_by_email(db, data.email):
+        raise HTTPException(status_code=400, detail="Email ya registrado")
+    usuario = Usuario(
+        nombre=data.nombre,
+        email=data.email,
+        password_hash=hash_password(data.password)
+    )
+    db.add(usuario)
+    db.commit()
+    db.refresh(usuario)
+    return usuario
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
@@ -59,12 +73,38 @@ def crear_admin_microempresa(db: Session, data):
 
     admin = AdminMicroempresa(
         id_usuario=usuario.id_usuario,
-        id_microempresa=data.id_microempresa
+        id_microempresa=data.id_microempresa if data.id_microempresa is not None else None
     )
     db.add(admin)
     db.commit()
     db.refresh(usuario)
     return usuario
+
+
+# ---------- ASIGNAR MICROEMPRESA A ADMIN ----------
+def asignar_microempresa_a_admin(db: Session, id_usuario: int, id_microempresa: int):
+    """Asigna una microempresa a un admin existente"""
+    # Validar que el usuario exista
+    usuario = db.query(Usuario).filter_by(id_usuario=id_usuario).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Si ya es admin, actualiza la microempresa
+    admin = db.query(AdminMicroempresa).filter_by(id_usuario=id_usuario).first()
+    if admin:
+        admin.id_microempresa = id_microempresa
+        db.commit()
+        db.refresh(admin)
+        return admin
+    # Si no es admin, lo crea
+    nuevo_admin = AdminMicroempresa(
+        id_usuario=id_usuario,
+        id_microempresa=id_microempresa
+    )
+    db.add(nuevo_admin)
+    db.commit()
+    db.refresh(nuevo_admin)
+    return nuevo_admin
 
 
 def crear_superadmin(db: Session, data):
@@ -109,3 +149,4 @@ def login(db: Session, email: str, password: str):
 def generar_token_recuperacion(email: str):
     """Genera un token temporal para recuperación de contraseña (15 min)"""
     return create_access_token(data={"email": email}, expires_minutes=15)
+
