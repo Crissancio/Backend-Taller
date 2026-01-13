@@ -1,3 +1,8 @@
+-- ==========================================
+-- 1. TABLAS INDEPENDIENTES (Sin Foreign Keys)
+-- ==========================================
+
+-- Tabla: usuario
 CREATE TABLE usuario (
     id_usuario SERIAL PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
@@ -6,6 +11,40 @@ CREATE TABLE usuario (
     estado BOOLEAN NOT NULL DEFAULT TRUE
 );
 
+-- Tabla: planes
+CREATE TABLE planes (
+    id_plan SERIAL PRIMARY KEY,
+    nombre VARCHAR NOT NULL UNIQUE,
+    precio DOUBLE PRECISION NOT NULL,
+    limite_usuarios INTEGER NOT NULL,
+    descripcion TEXT
+);
+
+-- Tabla: microempresas
+CREATE TABLE microempresas (
+    id_microempresa SERIAL PRIMARY KEY,
+    nombre VARCHAR NOT NULL,
+    nit VARCHAR NOT NULL UNIQUE,
+    direccion VARCHAR,
+    telefono VARCHAR,
+    moneda VARCHAR DEFAULT 'BOB',
+    impuestos DOUBLE PRECISION DEFAULT 0.0,
+    logo VARCHAR,
+    horario_atencion VARCHAR,
+    estado BOOLEAN DEFAULT TRUE,
+    fecha_registro TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Índices para microempresas
+CREATE INDEX ix_microempresas_nombre ON microempresas (nombre);
+CREATE INDEX ix_microempresas_nit ON microempresas (nit);
+
+
+-- ==========================================
+-- 2. TABLAS DEPENDIENTES (Con Foreign Keys)
+-- ==========================================
+
+-- Tabla: super_admin
 CREATE TABLE super_admin (
     id_usuario INTEGER PRIMARY KEY,
     CONSTRAINT fk_superadmin_usuario
@@ -14,6 +53,7 @@ CREATE TABLE super_admin (
         ON DELETE CASCADE
 );
 
+-- Tabla: admin_microempresa
 CREATE TABLE admin_microempresa (
     id_usuario INTEGER PRIMARY KEY,
     id_microempresa INTEGER NOT NULL,
@@ -25,10 +65,11 @@ CREATE TABLE admin_microempresa (
 
     CONSTRAINT fk_admin_microempresa
         FOREIGN KEY (id_microempresa)
-        REFERENCES microempresa(id_microempresa)
+        REFERENCES microempresas(id_microempresa) -- Corregido a plural
         ON DELETE CASCADE
 );
 
+-- Tabla: vendedor
 CREATE TABLE vendedor (
     id_usuario INTEGER PRIMARY KEY,
     id_microempresa INTEGER NOT NULL,
@@ -40,6 +81,31 @@ CREATE TABLE vendedor (
 
     CONSTRAINT fk_vendedor_microempresa
         FOREIGN KEY (id_microempresa)
-        REFERENCES microempresa(id_microempresa)
+        REFERENCES microempresas(id_microempresa) -- Corregido a plural
         ON DELETE CASCADE
 );
+
+-- Tabla: suscripciones
+CREATE TABLE suscripciones (
+    id_suscripcion SERIAL PRIMARY KEY,
+    fecha_inicio TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    fecha_fin TIMESTAMP WITH TIME ZONE,
+    estado BOOLEAN DEFAULT TRUE,
+    
+    id_microempresa INTEGER NOT NULL,
+    id_plan INTEGER NOT NULL,
+    
+    CONSTRAINT fk_suscripciones_microempresa 
+        FOREIGN KEY (id_microempresa) 
+        REFERENCES microempresas(id_microempresa)
+        ON DELETE CASCADE,
+        
+    CONSTRAINT fk_suscripciones_plan 
+        FOREIGN KEY (id_plan) 
+        REFERENCES planes(id_plan)
+        ON DELETE RESTRICT
+);
+
+-- Índices para suscripciones
+CREATE INDEX ix_suscripciones_id_microempresa ON suscripciones (id_microempresa);
+CREATE INDEX ix_suscripciones_id_plan ON suscripciones (id_plan);
