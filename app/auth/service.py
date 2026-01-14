@@ -1,17 +1,3 @@
-# ---------- CREAR USUARIO BASE (sin rol) ----------
-def crear_usuario_base(db: Session, data):
-    """Crea solo un usuario base, sin rol asociado"""
-    if get_user_by_email(db, data.email):
-        raise HTTPException(status_code=400, detail="Email ya registrado")
-    usuario = Usuario(
-        nombre=data.nombre,
-        email=data.email,
-        password_hash=hash_password(data.password)
-    )
-    db.add(usuario)
-    db.commit()
-    db.refresh(usuario)
-    return usuario
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
@@ -22,13 +8,11 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES
 
 
-# ---------- HELPERS ----------
 def get_user_by_email(db: Session, email: str):
     """Busca un usuario por email en la tabla base de usuarios"""
     return db.query(Usuario).filter(Usuario.email == email).first()
 
 
-# ---------- CREAR USUARIOS ----------
 def crear_vendedor(db: Session, data):
     """
     Crea un usuario base y un registro de Vendedor asociado a una microempresa
@@ -150,3 +134,17 @@ def generar_token_recuperacion(email: str):
     """Genera un token temporal para recuperación de contraseña (15 min)"""
     return create_access_token(data={"email": email}, expires_minutes=15)
 
+# ---------- CREAR USUARIO BASE (sin rol) ----------
+def crear_usuario_base(db: Session, data):
+    """Crea solo un usuario base, sin rol asociado"""
+    if get_user_by_email(db, data.email):
+        raise HTTPException(status_code=400, detail="Email ya registrado")
+    usuario = Usuario(
+        nombre=data.nombre,
+        email=data.email,
+        password_hash=hash_password(data.password)
+    )
+    db.add(usuario)
+    db.commit()
+    db.refresh(usuario)
+    return usuario

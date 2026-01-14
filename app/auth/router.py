@@ -1,11 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.auth import schemas, service
+from app.core.security import verify_password, hash_password
+from jose import JWTError, jwt
+from app.core.config import SECRET_KEY, ALGORITHM
 
 from app.users.schemas import UsuarioResponse
 from app.auth.schemas import RegistroUsuario
 from fastapi import Form
+from pydantic import BaseModel
 
 
 router = APIRouter()
@@ -126,3 +130,23 @@ def listar_vendedores(db: Session = Depends(get_db), user=Depends(get_current_us
         return [user]
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
+
+class RecuperarPasswordRequest(BaseModel):
+    token: str
+    nueva_password: str
+
+@router.post("/reset-password")
+def reset_password(data: RecuperarPasswordRequest = Body(...), db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(data.token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("email")
+        if not email:
+            raise HTTPException(status_code=400, detail="Token inválido")
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Token inválido o expirado")
+    usuario = db.query(service.Usuario).filter_by(email=email).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    usuario.password_hash = hash_password(data.nueva_password)
+    db.commit()
+    return {"detail": "Contraseña actualizada correctamente"}
