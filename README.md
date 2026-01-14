@@ -2,6 +2,18 @@
 
 ## Iniciar el backend
 
+- Crear venv:
+
+``` Bash
+python -m venv venv
+```
+
+o
+
+``` Bash
+python3 -m venv venv
+```
+
 - Iniciar venv:
 
 ```powersheall
