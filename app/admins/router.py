@@ -16,14 +16,26 @@ class AdminUpdate(BaseModel):
     nombre: str
     email: EmailStr
 
+
+# Listar admins SOLO aquí
 @router.get("/", response_model=list[UsuarioResponse])
 def listar_admins(db: Session = Depends(get_db), user=Depends(get_current_user)):
     rol = get_user_role(user, db)
+    def build_response(adm):
+        usuario = adm.usuario
+        return {
+            "id_usuario": usuario.id_usuario,
+            "nombre": usuario.nombre,
+            "email": usuario.email,
+            "estado": usuario.estado,
+            "rol": "adminmicroempresa",
+            "id_microempresa": adm.id_microempresa
+        }
     if rol == 'superadmin':
-        return [adm.usuario for adm in db.query(AdminMicroempresa).all()]
+        return [build_response(adm) for adm in db.query(AdminMicroempresa).all()]
     elif rol == 'adminmicroempresa':
         id_micro = user.admin_microempresa.id_microempresa
-        return [adm.usuario for adm in db.query(AdminMicroempresa).filter_by(id_microempresa=id_micro).all()]
+        return [build_response(adm) for adm in db.query(AdminMicroempresa).filter_by(id_microempresa=id_micro).all()]
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
 
@@ -33,10 +45,19 @@ def obtener_admin(id_usuario: int, db: Session = Depends(get_db), user=Depends(g
     admin = db.query(AdminMicroempresa).filter_by(id_usuario=id_usuario).first()
     if not admin:
         raise HTTPException(status_code=404, detail="Admin no encontrado")
+    usuario = admin.usuario
+    response = {
+        "id_usuario": usuario.id_usuario,
+        "nombre": usuario.nombre,
+        "email": usuario.email,
+        "estado": usuario.estado,
+        "rol": "adminmicroempresa",
+        "id_microempresa": admin.id_microempresa
+    }
     if rol == 'superadmin':
-        return admin.usuario
+        return response
     elif rol == 'adminmicroempresa' and user.admin_microempresa.id_microempresa == admin.id_microempresa:
-        return admin.usuario
+        return response
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
 

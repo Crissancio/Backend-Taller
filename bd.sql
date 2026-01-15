@@ -12,11 +12,23 @@ CREATE TABLE usuario (
 );
 
 -- Tabla: planes
+/* MODIFICADO
 CREATE TABLE planes (
     id_plan SERIAL PRIMARY KEY,
     nombre VARCHAR NOT NULL UNIQUE,
     precio DOUBLE PRECISION NOT NULL,
     limite_usuarios INTEGER NOT NULL,
+    descripcion TEXT
+);
+*/
+CREATE TABLE planes (
+    id_plan SERIAL PRIMARY KEY,
+    nombre VARCHAR NOT NULL UNIQUE,
+    precio DOUBLE PRECISION NOT NULL,
+    limite_productos INTEGER NOT NULL,
+    limite_admins INTEGER NOT NULL,
+    limite_vendedores INTEGER NOT NULL,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
     descripcion TEXT
 );
 

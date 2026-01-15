@@ -16,16 +16,35 @@ class VendedorUpdate(BaseModel):
     nombre: str
     email: EmailStr
 
+
+# Listar vendedores SOLO aquí
 @router.get("/", response_model=list[UsuarioResponse])
 def listar_vendedores(db: Session = Depends(get_db), user=Depends(get_current_user)):
     rol = get_user_role(user, db)
+    def build_response(v):
+        usuario = v.usuario
+        return {
+            "id_usuario": usuario.id_usuario,
+            "nombre": usuario.nombre,
+            "email": usuario.email,
+            "estado": usuario.estado,
+            "rol": "vendedor",
+            "id_microempresa": v.id_microempresa
+        }
     if rol == 'superadmin':
-        return [v.usuario for v in db.query(Vendedor).all()]
+        return [build_response(v) for v in db.query(Vendedor).all()]
     elif rol == 'adminmicroempresa':
         id_micro = user.admin_microempresa.id_microempresa
-        return [v.usuario for v in db.query(Vendedor).filter_by(id_microempresa=id_micro).all()]
+        return [build_response(v) for v in db.query(Vendedor).filter_by(id_microempresa=id_micro).all()]
     elif rol == 'vendedor':
-        return [user]
+        return [{
+            "id_usuario": user.id_usuario,
+            "nombre": user.nombre,
+            "email": user.email,
+            "estado": user.estado,
+            "rol": "vendedor",
+            "id_microempresa": user.vendedor.id_microempresa if hasattr(user, 'vendedor') and user.vendedor else None
+        }]
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
 
@@ -35,12 +54,21 @@ def obtener_vendedor(id_usuario: int, db: Session = Depends(get_db), user=Depend
     vendedor = db.query(Vendedor).filter_by(id_usuario=id_usuario).first()
     if not vendedor:
         raise HTTPException(status_code=404, detail="Vendedor no encontrado")
+    usuario = vendedor.usuario
+    response = {
+        "id_usuario": usuario.id_usuario,
+        "nombre": usuario.nombre,
+        "email": usuario.email,
+        "estado": usuario.estado,
+        "rol": "vendedor",
+        "id_microempresa": vendedor.id_microempresa
+    }
     if rol == 'superadmin':
-        return vendedor.usuario
+        return response
     elif rol == 'adminmicroempresa' and user.admin_microempresa.id_microempresa == vendedor.id_microempresa:
-        return vendedor.usuario
+        return response
     elif rol == 'vendedor' and user.id_usuario == id_usuario:
-        return vendedor.usuario
+        return response
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
 

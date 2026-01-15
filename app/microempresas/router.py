@@ -1,3 +1,5 @@
+from app.users.models import AdminMicroempresa, Vendedor
+from app.users.schemas import UsuarioResponse
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database.session import get_db
@@ -10,12 +12,41 @@ router = APIRouter(
 )
 
 
-# CREAR (solo superadmin)
+# ENDPOINT: Obtener administradores de una microempresa por id
+@router.get("/{id_microempresa}/admins", response_model=list[UsuarioResponse])
+def obtener_admins_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    admins = db.query(AdminMicroempresa).filter_by(id_microempresa=id_microempresa).all()
+    return [
+        {
+            "id_usuario": adm.usuario.id_usuario,
+            "nombre": adm.usuario.nombre,
+            "email": adm.usuario.email,
+            "estado": adm.usuario.estado,
+            "rol": "adminmicroempresa",
+            "id_microempresa": adm.id_microempresa
+        }
+        for adm in admins
+    ]
+
+# ENDPOINT: Obtener vendedores de una microempresa por id
+@router.get("/{id_microempresa}/vendedores", response_model=list[UsuarioResponse])
+def obtener_vendedores_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    vendedores = db.query(Vendedor).filter_by(id_microempresa=id_microempresa).all()
+    return [
+        {
+            "id_usuario": v.usuario.id_usuario,
+            "nombre": v.usuario.nombre,
+            "email": v.usuario.email,
+            "estado": v.usuario.estado,
+            "rol": "vendedor",
+            "id_microempresa": v.id_microempresa
+        }
+        for v in vendedores
+    ]
+
+# CREAR (acceso para todos los roles autenticados)
 @router.post("/", response_model=schemas.MicroempresaResponse)
 def crear_empresa(empresa: schemas.MicroempresaCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    rol = get_user_role(user, db)
-    if rol != 'superadmin':
-        raise HTTPException(status_code=403, detail="Solo superadmin puede crear microempresas")
     try:
         return service.crear_microempresa(db, empresa)
     except ValueError as e:
@@ -39,15 +70,7 @@ def listar_empresas(db: Session = Depends(get_db), user=Depends(get_current_user
 
 # SUSCRIPCIÓN (solo superadmin o admin de esa microempresa)
 @router.post("/{id_microempresa}/suscripcion", response_model=schemas.SuscripcionResponse)
-def suscribir(id_microempresa: int, suscripcion: schemas.SuscripcionCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    rol = get_user_role(user, db)
-    if rol == 'superadmin' or (rol == 'adminmicroempresa' and user.admin_microempresa.id_microempresa == id_microempresa):
-        try:
-            return service.suscribir_empresa(db, id_microempresa, suscripcion.id_plan)
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-    else:
-        raise HTTPException(status_code=403, detail="No autorizado")
+    # This subscription route has been removed as there is a dedicated module for subscriptions.
 # --- CRUD MICROEMPRESA (restricciones) ---
 # OBTENER
 @router.get("/{id_microempresa}", response_model=schemas.MicroempresaResponse)

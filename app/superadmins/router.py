@@ -16,6 +16,8 @@ class SuperAdminUpdate(BaseModel):
     nombre: str
     email: EmailStr
 
+
+# Listar superadmins SOLO aquí
 @router.get("/", response_model=list[UsuarioResponse])
 def listar_superadmins(db: Session = Depends(get_db), user=Depends(get_current_user)):
     if get_user_role(user, db) != 'superadmin':

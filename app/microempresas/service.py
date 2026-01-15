@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from app.microempresas import models
+from app.planes.models import Plan
 
 def crear_microempresa(db: Session, data: models.MicroempresaCreate):
     existe = db.query(models.Microempresa).filter(models.Microempresa.nit == data.nit).first()
@@ -24,7 +25,7 @@ def suscribir_empresa(db: Session, id_microempresa: int, id_plan: int):
     if not empresa:
         raise ValueError("Microempresa no encontrada")
 
-    plan = db.query(models.Plan).filter(models.Plan.id_plan == id_plan).first()
+        plan = db.query(Plan).filter(Plan.id_plan == id_plan).first()
     if not plan:
         raise ValueError("Plan no encontrado")
 

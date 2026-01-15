@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from . import schemas, service
+from pydantic import ValidationError
 
 router = APIRouter(
     prefix="/planes",
@@ -10,7 +11,12 @@ router = APIRouter(
 
 @router.post("/", response_model=schemas.PlanResponse)
 def crear_plan(plan: schemas.PlanCreate, db: Session = Depends(get_db)):
-    return service.crear_plan(db, plan)
+    try:
+        return service.crear_plan(db, plan)
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/", response_model=list[schemas.PlanResponse])
 def listar_planes(db: Session = Depends(get_db)):
@@ -25,10 +31,15 @@ def obtener_plan(id_plan: int, db: Session = Depends(get_db)):
 
 @router.put("/{id_plan}", response_model=schemas.PlanResponse)
 def actualizar_plan(id_plan: int, plan: schemas.PlanCreate, db: Session = Depends(get_db)):
-    actualizado = service.actualizar_plan(db, id_plan, plan)
-    if not actualizado:
-        raise HTTPException(status_code=404, detail="Plan no encontrado")
-    return actualizado
+    try:
+        actualizado = service.actualizar_plan(db, id_plan, plan)
+        if not actualizado:
+            raise HTTPException(status_code=404, detail="Plan no encontrado")
+        return actualizado
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors())
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.delete("/{id_plan}")
 def eliminar_plan(id_plan: int, db: Session = Depends(get_db)):
