@@ -6,13 +6,13 @@ from typing import Optional
 
 
 
+
 class PlanBase(BaseModel):
     nombre: str
     precio: float
     limite_productos: int
     limite_admins: int
     limite_vendedores: int
-    activo: bool = True
     descripcion: Optional[str] = None
 
     @field_validator('precio')
@@ -38,5 +38,6 @@ class PlanCreate(PlanBase):
 
 class PlanResponse(PlanBase):
     id_plan: int
+    activo: bool
     class Config:
         from_attributes = True

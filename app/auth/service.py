@@ -129,10 +129,12 @@ def login(db: Session, email: str, password: str):
     return token
 
 
+
 # ---------- RECUPERACIÓN DE CONTRASEÑA ----------
 def generar_token_recuperacion(email: str):
     """Genera un token temporal para recuperación de contraseña (15 min)"""
     return create_access_token(data={"email": email}, expires_minutes=15)
+
 
 # ---------- CREAR USUARIO BASE (sin rol) ----------
 def crear_usuario_base(db: Session, data):

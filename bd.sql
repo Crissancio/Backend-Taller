@@ -118,6 +118,27 @@ CREATE TABLE suscripciones (
         ON DELETE RESTRICT
 );
 
+CREATE TABLE cliente (
+    id_cliente SERIAL PRIMARY KEY,
+    id_microempresa INTEGER NOT NULL,   -- id_tenant
+
+    nombre VARCHAR(150) NOT NULL,
+    documento VARCHAR(50),
+    telefono VARCHAR(30),
+    email VARCHAR(150),
+
+    estado BOOLEAN NOT NULL DEFAULT TRUE,  -- TRUE = activo, FALSE = eliminado
+
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_cliente_microempresa
+        FOREIGN KEY (id_microempresa)
+        REFERENCES microempresas(id_microempresa)
+        ON DELETE CASCADE
+);
+
+
+
 -- Índices para suscripciones
 CREATE INDEX ix_suscripciones_id_microempresa ON suscripciones (id_microempresa);
 CREATE INDEX ix_suscripciones_id_plan ON suscripciones (id_plan);

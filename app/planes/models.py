@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Text
+from sqlalchemy import Column, Integer, String, Float, Text, Boolean
 from app.database.base import Base
 
 class Plan(Base):
@@ -9,5 +9,5 @@ class Plan(Base):
     limite_productos = Column(Integer, nullable=False)
     limite_admins = Column(Integer, nullable=False)
     limite_vendedores = Column(Integer, nullable=False)
-    activo = Column(Integer, nullable=False, default=True)
+    activo = Column(Boolean, nullable=False, default=True)
     descripcion = Column(Text, nullable=True)

@@ -24,9 +24,32 @@ router = APIRouter(
 from app.core.dependencies import get_current_user
 
 # ---------- REGISTRO ----------
+
+
 @router.post("/register/vendedor", response_model=UsuarioResponse)
-def registrar_vendedor(data: schemas.RegistroVendedor, db: Session = Depends(get_db)):
-    return service.crear_vendedor(db, data)
+def registrar_vendedor(data: schemas.RegistroVendedor, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    # Usar el email como contraseña por defecto
+    password_defecto = data.email
+    # Obtener el id_microempresa del admin autenticado
+    id_microempresa = None
+    if hasattr(user, 'admin_microempresa') and user.admin_microempresa:
+        id_microempresa = user.admin_microempresa.id_microempresa
+    # Construir el objeto de registro
+    vendedor_data = schemas.RegistroVendedor(
+        nombre=data.nombre,
+        email=data.email,
+        password=password_defecto,
+        id_microempresa=id_microempresa
+    )
+    nuevo_usuario = service.crear_vendedor(db, vendedor_data)
+    # Construir respuesta con rol
+    return {
+        "id_usuario": nuevo_usuario.id_usuario,
+        "nombre": nuevo_usuario.nombre,
+        "email": nuevo_usuario.email,
+        "estado": nuevo_usuario.estado,
+        "rol": "vendedor"
+    }
 
 @router.post("/register/admin", response_model=UsuarioResponse)
 def registrar_admin(data: schemas.RegistroAdminMicroempresa, db: Session = Depends(get_db)):
@@ -37,9 +60,17 @@ def registrar_admin(data: schemas.RegistroAdminMicroempresa, db: Session = Depen
 def asignar_microempresa(id_usuario: int, id_microempresa: int, db: Session = Depends(get_db)):
     return service.asignar_microempresa_a_admin(db, id_usuario, id_microempresa)
 
+
 @router.post("/register/superadmin", response_model=UsuarioResponse)
 def registrar_superadmin(data: schemas.RegistroSuperAdmin, db: Session = Depends(get_db)):
-    return service.crear_superadmin(db, data)
+    nuevo_usuario = service.crear_superadmin(db, data)
+    return {
+        "id_usuario": nuevo_usuario.id_usuario,
+        "nombre": nuevo_usuario.nombre,
+        "email": nuevo_usuario.email,
+        "estado": nuevo_usuario.estado,
+        "rol": "superadmin"
+    }
 
 
 

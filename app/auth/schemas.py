@@ -13,10 +13,12 @@ class RegistroBase(BaseModel):
     email: EmailStr
     password: str
 
-class RegistroVendedor(RegistroBase):
-    id_microempresa: Optional[int] = None  # Ahora es opcional
 
-from typing import Optional
+class RegistroVendedor(BaseModel):
+    nombre: str
+    email: EmailStr
+    password: Optional[str] = None
+    id_microempresa: Optional[int] = None
 
 class RegistroAdminMicroempresa(RegistroBase):
     id_microempresa: Optional[int] = None  # Ahora es opcional

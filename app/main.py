@@ -13,7 +13,9 @@ from app.planes.router import router as planes_router
 from app.suscripciones.router import router as suscripciones_router
 from app.superadmins.router import router as superadmins_router
 from app.admins.router import router as admins_router
+
 from app.vendedores.router import router as vendedores_router
+from app.clientes.router import router as clientes_router
 
 from app.auth.base_user import Usuario  # sin SuperAdmin
 from app.auth.models import SuperAdmin
@@ -38,6 +40,7 @@ app.add_middleware(
 
 # Ordenar routers para que Swagger muestre primero usuarios, luego roles, luego otros módulos
 app.include_router(users_router)
+app.include_router(clientes_router)
 app.include_router(superadmins_router)
 app.include_router(admins_router)
 app.include_router(vendedores_router)

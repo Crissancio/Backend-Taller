@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database.session import get_db
@@ -102,5 +103,20 @@ def actualizar_vendedor(id_usuario: int, data: VendedorUpdate, db: Session = Dep
         db.commit()
         db.refresh(usuario)
         return usuario
+    else:
+        raise HTTPException(status_code=403, detail="No autorizado")
+
+@router.put("/{id_usuario}/baja-logica", response_model=dict)
+def baja_logica_vendedor(id_usuario: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    rol = get_user_role(user, db)
+    vendedor = db.query(Vendedor).filter_by(id_usuario=id_usuario).first()
+    if not vendedor:
+        raise HTTPException(status_code=404, detail="Vendedor no encontrado")
+    usuario = vendedor.usuario
+    # Permitir solo a superadmin, admin de la microempresa o el propio vendedor
+    if rol == 'superadmin' or (rol == 'adminmicroempresa' and user.admin_microempresa.id_microempresa == vendedor.id_microempresa) or (rol == 'vendedor' and user.id_usuario == id_usuario):
+        usuario.estado = False
+        db.commit()
+        return {"detail": "Vendedor dado de baja lógicamente"}
     else:
         raise HTTPException(status_code=403, detail="No autorizado")

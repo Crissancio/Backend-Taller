@@ -21,3 +21,4 @@ class Microempresa(Base):
     # Relaciones
     admins = relationship("AdminMicroempresa", back_populates="microempresa")
     vendedores = relationship("Vendedor", back_populates="microempresa")
+    clientes = relationship("Cliente", back_populates="microempresa")

@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 
 def crear_plan(db: Session, data: schemas.PlanCreate):
-    plan = models.Plan(**data.dict())
+    plan = models.Plan(**data.dict(), activo=True)
     db.add(plan)
     db.commit()
     db.refresh(plan)
