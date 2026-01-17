@@ -1,4 +1,5 @@
 
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database.session import get_db
@@ -15,7 +16,7 @@ router = APIRouter(
 def crear_cliente(cliente: schemas.ClienteCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     rol = get_user_role(user, db)
     id_microempresa = cliente.id_microempresa
-    # Si el usuario es adminmicroempresa o vendedor, asignar su microempresa
+    
     if rol == "adminmicroempresa" and hasattr(user, "admin_microempresa") and user.admin_microempresa:
         id_microempresa = user.admin_microempresa.id_microempresa
     elif rol == "vendedor" and hasattr(user, "vendedor") and user.vendedor:
@@ -32,6 +33,16 @@ def crear_cliente(cliente: schemas.ClienteCreate, db: Session = Depends(get_db),
 @router.get("/", response_model=list[schemas.ClienteResponse])
 def listar_clientes(db: Session = Depends(get_db)):
     return service.listar_clientes(db)
+
+# Ruta para listar clientes activos (sin filtrar por microempresa)
+@router.get("/activos", response_model=list[schemas.ClienteResponse])
+def listar_clientes_activos(db: Session = Depends(get_db)):
+    return service.listar_clientes_activos(db)
+
+# Ruta para listar clientes inactivos (sin filtrar por microempresa)
+@router.get("/inactivos", response_model=list[schemas.ClienteResponse])
+def listar_clientes_inactivos(db: Session = Depends(get_db)):
+    return service.listar_clientes_inactivos(db)
 
 @router.get("/{id_cliente}", response_model=schemas.ClienteResponse)
 def obtener_cliente(id_cliente: int, db: Session = Depends(get_db)):
