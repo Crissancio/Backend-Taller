@@ -1,5 +1,6 @@
 
 
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.database.session import get_db
@@ -10,6 +11,17 @@ router = APIRouter(
     prefix="/planes",
     tags=["Planes"]
 )
+
+
+# Ruta para crear un nuevo plan
+@router.post("/", response_model=schemas.PlanResponse)
+def crear_plan(plan: schemas.PlanCreate, db: Session = Depends(get_db)):
+    try:
+        return service.crear_plan(db, plan)
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors())
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/total/activos", response_model=dict)
