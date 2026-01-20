@@ -24,12 +24,13 @@ def listar_categorias_inactivas(db: Session = Depends(get_db)):
 @router.post("/{id_producto}/activar", response_model=schemas.ProductoResponse)
 def activar_producto(id_producto: int, db: Session = Depends(get_db)):
     result = service.activar_producto(db, id_producto)
-    if not result:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
-    return result
 
-@router.post("/{id_producto}/desactivar", response_model=schemas.ProductoResponse)
-def desactivar_producto(id_producto: int, db: Session = Depends(get_db)):
+@router.get("/categoria/{id_categoria}", response_model=schemas.CategoriaResponse)
+def obtener_categoria(id_categoria: int, db: Session = Depends(get_db)):
+    categoria = db.query(service.models.Categoria).filter(service.models.Categoria.id_categoria == id_categoria).first()
+    if not categoria:
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    return categoria
     result = service.desactivar_producto(db, id_producto)
     if not result:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -231,3 +232,11 @@ def listar_productos_con_stock_por_microempresa(id_microempresa: int, db: Sessio
 
 
 
+@router.get("/microempresa/{id_microempresa}/sin-stock", response_model=list[schemas.ProductoResponse])
+def listar_productos_sin_stock_por_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    from app.inventario.models import Stock
+    productos = db.query(service.models.Producto).join(Stock, service.models.Producto.id_producto == Stock.id_producto).filter(
+        service.models.Producto.id_microempresa == id_microempresa,
+        Stock.cantidad == 0
+    ).all()
+    return productos
