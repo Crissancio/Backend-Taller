@@ -24,6 +24,15 @@ def listar_categorias_inactivas(db: Session = Depends(get_db)):
 @router.post("/{id_producto}/activar", response_model=schemas.ProductoResponse)
 def activar_producto(id_producto: int, db: Session = Depends(get_db)):
     result = service.activar_producto(db, id_producto)
+    if not result:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return result
+@router.post("/{id_producto}/desactivar", response_model=schemas.ProductoResponse)
+def desactivar_producto(id_producto: int, db: Session = Depends(get_db)):
+    result = service.desactivar_producto(db, id_producto)
+    if not result:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return result
 
 @router.get("/categoria/{id_categoria}", response_model=schemas.CategoriaResponse)
 def obtener_categoria(id_categoria: int, db: Session = Depends(get_db)):
