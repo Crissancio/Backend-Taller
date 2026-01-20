@@ -16,11 +16,18 @@ router = APIRouter(
 def crear_cliente(cliente: schemas.ClienteCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     rol = get_user_role(user, db)
     id_microempresa = cliente.id_microempresa
-    
+    # Asignar id_microempresa según el rol canónico
     if rol == "adminmicroempresa" and hasattr(user, "admin_microempresa") and user.admin_microempresa:
         id_microempresa = user.admin_microempresa.id_microempresa
     elif rol == "vendedor" and hasattr(user, "vendedor") and user.vendedor:
         id_microempresa = user.vendedor.id_microempresa
+    elif rol == "superadmin":
+        # superadmin puede crear clientes para cualquier microempresa
+        pass
+    elif rol == "usuario":
+        raise HTTPException(status_code=403, detail="No autorizado para crear clientes")
+    else:
+        raise HTTPException(status_code=403, detail="Rol no autorizado para crear clientes")
     cliente_data = schemas.ClienteCreate(
         nombre=cliente.nombre,
         documento=cliente.documento,

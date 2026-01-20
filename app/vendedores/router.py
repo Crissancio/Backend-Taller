@@ -34,17 +34,17 @@ def listar_vendedores(db: Session = Depends(get_db), user=Depends(get_current_us
         }
     if rol == 'superadmin':
         return [build_response(v) for v in db.query(Vendedor).all()]
-    elif rol == 'adminmicroempresa':
+    elif rol == 'adminmicroempresa' and hasattr(user, 'admin_microempresa') and user.admin_microempresa:
         id_micro = user.admin_microempresa.id_microempresa
         return [build_response(v) for v in db.query(Vendedor).filter_by(id_microempresa=id_micro).all()]
-    elif rol == 'vendedor':
+    elif rol == 'vendedor' and hasattr(user, 'vendedor') and user.vendedor:
         return [{
             "id_usuario": user.id_usuario,
             "nombre": user.nombre,
             "email": user.email,
             "estado": user.estado,
             "rol": "vendedor",
-            "id_microempresa": user.vendedor.id_microempresa if hasattr(user, 'vendedor') and user.vendedor else None
+            "id_microempresa": user.vendedor.id_microempresa
         }]
     else:
         raise HTTPException(status_code=403, detail="No autorizado")

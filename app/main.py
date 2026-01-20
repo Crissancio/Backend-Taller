@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, Depends, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,6 +15,9 @@ from app.admins.router import router as admins_router
 
 from app.vendedores.router import router as vendedores_router
 from app.clientes.router import router as clientes_router
+from app.productos.router import router as productos_router
+from app.inventario.router import router as inventario_router
+from app.notificaciones.router import router as notificaciones_router
 
 from app.auth.base_user import Usuario  # sin SuperAdmin
 from app.auth.models import SuperAdmin
@@ -31,7 +33,7 @@ app = FastAPI()
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Cambia esto a la URL de tu frontend en producción
+    allow_origins=["http://localhost:5173"],  # Origen exacto del frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -48,6 +50,9 @@ app.include_router(microempresas_router)
 app.include_router(planes_router)
 app.include_router(suscripciones_router)
 app.include_router(auth_router)
+app.include_router(productos_router)
+app.include_router(inventario_router)
+app.include_router(notificaciones_router)
 
 
 # Ruta /login en la raíz, reutilizando la lógica de auth

@@ -31,9 +31,12 @@ def registrar_vendedor(data: schemas.RegistroVendedor, db: Session = Depends(get
     # Usar el email como contraseña por defecto
     password_defecto = data.email
     # Obtener el id_microempresa del admin autenticado
+    rol = get_user_role(user, db)
     id_microempresa = None
-    if hasattr(user, 'admin_microempresa') and user.admin_microempresa:
+    if rol == "adminmicroempresa" and hasattr(user, 'admin_microempresa') and user.admin_microempresa:
         id_microempresa = user.admin_microempresa.id_microempresa
+    else:
+        raise HTTPException(status_code=403, detail="Solo un adminmicroempresa puede registrar vendedores")
     # Construir el objeto de registro
     vendedor_data = schemas.RegistroVendedor(
         nombre=data.nombre,
