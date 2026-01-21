@@ -1,5 +1,7 @@
+import os
 from fastapi import FastAPI, Depends, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.microempresas.router import router as microempresas_router
 from app.users.router import router as users_router
@@ -33,11 +35,17 @@ app = FastAPI()
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Origen exacto del frontend
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], # Agregamos ambas variaciones por seguridad
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
 )
+# -- IMAGENES 
+# 1. Aseguramos que la carpeta exista para que no de error al arrancar
+os.makedirs("public/productos", exist_ok=True)
+
+# 2. Montamos la ruta "/public" para que sirva los archivos de la carpeta física "public"
+app.mount("/public", StaticFiles(directory="public"), name="public")
 
 
 # Ordenar routers para que Swagger muestre primero usuarios, luego roles, luego otros módulos
@@ -53,7 +61,6 @@ app.include_router(auth_router)
 app.include_router(productos_router)
 app.include_router(inventario_router)
 app.include_router(notificaciones_router)
-
 
 # Ruta /login en la raíz, reutilizando la lógica de auth
 @app.post("/login", response_model=TokenResponse, tags=["Auth"])

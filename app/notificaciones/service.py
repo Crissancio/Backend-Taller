@@ -1,21 +1,30 @@
-# service.py para notificaciones
-
 from sqlalchemy.orm import Session
 from . import models, schemas
 from .websocket import notificar_usuario
 import asyncio
+from datetime import datetime
 
 def crear_notificacion(db: Session, notificacion: schemas.NotificacionCreate):
-    db_notificacion = models.Notificacion(**notificacion.dict())
+    # Convertimos el esquema a diccionario
+    notificacion_data = notificacion.dict()
+    
+    # Creamos la instancia del modelo
+    db_notificacion = models.Notificacion(**notificacion_data)
+    
+    # 2. ASIGNAR LA FECHA DE CREACIÓN MANUALMENTE
+    db_notificacion.fecha_creacion = datetime.now() 
+
     db.add(db_notificacion)
     db.commit()
     db.refresh(db_notificacion)
+    
     # Enviar notificación por WebSocket si el usuario está conectado
-    mensaje = f"Nueva notificación: {db_notificacion.mensaje}"
     try:
+        mensaje = f"Nueva notificación: {db_notificacion.mensaje}"
         asyncio.create_task(notificar_usuario(db_notificacion.id_usuario, mensaje))
     except Exception:
         pass
+        
     return db_notificacion
 
 def actualizar_notificacion(db: Session, id_notificacion: int, notificacion: schemas.NotificacionUpdate):

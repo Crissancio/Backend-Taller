@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, Field
 from typing import Optional
+from datetime import datetime
 
 class NotificacionBase(BaseModel):
     id_microempresa: int
@@ -20,6 +21,7 @@ class NotificacionUpdate(BaseModel):
 
 class NotificacionResponse(NotificacionBase):
     id_notificacion: int
-    fecha_creacion: str
+    #fecha_creacion: str
+    fecha_creacion: Optional[datetime] = None
     class Config:
         from_attributes = True
