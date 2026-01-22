@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, P
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from . import schemas, service
-from app.inventario.models import Stock
 from app.core.dependencies import get_current_user
 #-----------------imports para notificaciones------
 from app.notificaciones import service as notif_service
@@ -11,13 +10,13 @@ from typing import Optional
 
 router = APIRouter(prefix="/productos", tags=["Productos"])
 
-# --- CATEGORÍAS ---
+# --- CATEGORÍAS (Endpoints Admin/Microempresa por URL) ---
 @router.post("/microempresas/{id_microempresa}/categorias", response_model=schemas.CategoriaResponse)
-def crear_categoria(id_microempresa: int = Path(...), categoria: schemas.CategoriaCreate = Body(...), db: Session = Depends(get_db)):
+def crear_categoria_admin(id_microempresa: int = Path(...), categoria: schemas.CategoriaCreate = Body(...), db: Session = Depends(get_db)):
     return service.crear_categoria(db, id_microempresa, categoria)
 
 @router.get("/microempresas/{id_microempresa}/categorias", response_model=list[schemas.CategoriaResponse])
-def listar_categorias_activas(id_microempresa: int, db: Session = Depends(get_db)):
+def listar_categorias_activas_admin(id_microempresa: int, db: Session = Depends(get_db)):
     return service.listar_categorias_activas(db, id_microempresa)
 
 @router.put("/categorias/{id_categoria}", response_model=schemas.CategoriaResponse)
@@ -29,36 +28,26 @@ def cambiar_estado_categoria(id_categoria: int, estado: bool = Body(...), id_mic
     return service.cambiar_estado_categoria(db, id_categoria, id_microempresa, estado)
 
 # --- ENDPOINT DEL PORTAL (PÚBLICO) ---
-# Cumple el requerimiento: "Visible a cualquier usuario" y "Solo mostrar productos nuevos/con stock"
 @router.get("/portal/{id_microempresa}/listado", response_model=list[schemas.ProductoResponse])
 def listar_productos_portal_publico(id_microempresa: int, db: Session = Depends(get_db)):
     """
     Lista productos activos y con stock > 0 para el portal público.
     No requiere autenticación.
     """
-    productos = (
-        db.query(service.models.Producto)
-        .join(Stock, service.models.Producto.id_producto == Stock.id_producto)
-        .filter(
-            service.models.Producto.id_microempresa == id_microempresa,
-            service.models.Producto.estado == True,
-            Stock.cantidad > 0 
-        )
-        .all()
-    )
-    return productos
-
+    return service.listar_productos_portal_publico(db, id_microempresa)
 
 @router.get("/microempresa/{id_microempresa}/buscar", response_model=list[schemas.ProductoResponse])
 def filtrar_productos_por_microempresa_y_nombre(id_microempresa: int, nombre: str, db: Session = Depends(get_db)):
     return service.filtrar_productos_por_microempresa_y_nombre(db, id_microempresa, nombre)
 
+# --- ENDPOINTS GLOBALES (CATEGORIAS) ---
 @router.get("/categoria/activas", response_model=list[schemas.CategoriaResponse])
-def listar_categorias_activas(db: Session = Depends(get_db)):
-    return service.listar_categorias_activas(db)
+def listar_categorias_activas_global(db: Session = Depends(get_db)):
+    # CORREGIDO: Llama a función sin argumentos de ID
+    return service.listar_todas_categorias_activas(db)
 
 @router.get("/categoria/inactivas", response_model=list[schemas.CategoriaResponse])
-def listar_categorias_inactivas(db: Session = Depends(get_db)):
+def listar_categorias_inactivas_global(db: Session = Depends(get_db)):
     return service.listar_categorias_inactivas(db)
 
 @router.post("/{id_producto}/activar", response_model=schemas.ProductoResponse)
@@ -82,13 +71,13 @@ def obtener_categoria(id_categoria: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
     return categoria
 
+# --- CATEGORÍAS (Endpoints con Auth Current User) ---
 @router.post("/categoria", response_model=schemas.CategoriaResponse)
 def crear_categoria(
     categoria: schemas.CategoriaCreate,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    # Si el usuario es adminmicroempresa o vendedor, usar su id_microempresa
     id_microempresa = None
     if hasattr(current_user, "admin_microempresa") and current_user.admin_microempresa:
         id_microempresa = current_user.admin_microempresa.id_microempresa
@@ -96,9 +85,12 @@ def crear_categoria(
         id_microempresa = current_user.vendedor.id_microempresa
     else:
         raise HTTPException(status_code=403, detail="No autorizado para crear categorías")
+    
     categoria_data = categoria.dict()
     categoria_data["id_microempresa"] = id_microempresa
-    return service.crear_categoria(db, schemas.CategoriaCreate(**categoria_data))
+    
+    # CORREGIDO: Se pasa id_microempresa
+    return service.crear_categoria(db, id_microempresa, schemas.CategoriaCreate(**categoria_data))
 
 @router.put("/categoria/{id_categoria}", response_model=schemas.CategoriaResponse)
 def actualizar_categoria(id_categoria: int, categoria: schemas.CategoriaUpdate, db: Session = Depends(get_db)):
@@ -124,17 +116,11 @@ def listar_categorias_por_microempresa(id_microempresa: int, db: Session = Depen
 
 @router.get("/categoria/microempresa/{id_microempresa}/activas", response_model=list[schemas.CategoriaResponse])
 def listar_categorias_activas_por_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
-    return db.query(service.models.Categoria).filter(
-        service.models.Categoria.id_microempresa == id_microempresa,
-        service.models.Categoria.activo == True
-    ).all()
+    return service.listar_categorias_activas(db, id_microempresa)
 
 @router.get("/categoria/microempresa/{id_microempresa}/inactivas", response_model=list[schemas.CategoriaResponse])
 def listar_categorias_inactivas_por_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
-    return db.query(service.models.Categoria).filter(
-        service.models.Categoria.id_microempresa == id_microempresa,
-        service.models.Categoria.activo == False
-    ).all()
+    return service.listar_categorias_inactivas(db)
 
 @router.post("/categoria/{id_categoria}/activar", response_model=schemas.CategoriaResponse)
 def activar_categoria(id_categoria: int, db: Session = Depends(get_db)):
@@ -146,7 +132,7 @@ def activar_categoria(id_categoria: int, db: Session = Depends(get_db)):
     db.refresh(categoria)
     return categoria
 
-# --- AQUÍ ESTÁ LA LÓGICA DE NOTIFICACIÓN ---
+# --- PRODUCTOS (Lógica Principal con Auth) ---
 @router.post("/", response_model=schemas.ProductoResponse)
 def crear_producto(
     nombre: str = Form(...),
@@ -160,7 +146,6 @@ def crear_producto(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    # Asignar id_microempresa según usuario autenticado
     id_microempresa = None
     if hasattr(current_user, "admin_microempresa") and current_user.admin_microempresa:
         id_microempresa = current_user.admin_microempresa.id_microempresa
@@ -175,7 +160,6 @@ def crear_producto(
         from uuid import uuid4
         ext = os.path.splitext(imagen.filename)[1]
         filename = f"{uuid4().hex}{ext}"
-        # Asegurarse que la carpeta exista
         os.makedirs(os.path.join("public", "productos"), exist_ok=True)
         save_path = os.path.join("public", "productos", filename)
         with open(save_path, "wb") as f:
@@ -194,7 +178,8 @@ def crear_producto(
         "id_microempresa": id_microempresa
     }
     
-    nuevo_producto = service.crear_producto(db, schemas.ProductoCreate(**producto_data))
+    # CORREGIDO: Se pasa id_microempresa
+    nuevo_producto = service.crear_producto(db, id_microempresa, schemas.ProductoCreate(**producto_data))
 
     '''
     try:
@@ -206,7 +191,7 @@ def crear_producto(
         )
         notif_service.crear_notificacion(db, notif_data)
     except Exception as e:
-        print(f"Error creando notificación: {e}") # No bloqueamos la creación del producto si falla la notificación
+        print(f"Error creando notificación: {e}") 
     '''
     return nuevo_producto
 
@@ -225,8 +210,8 @@ def eliminar_producto_fisico(id_producto: int, db: Session = Depends(get_db)):
     return result
 
 @router.get("/", response_model=list[schemas.ProductoResponse])
-def listar_productos(db: Session = Depends(get_db)):
-    return service.listar_productos(db)
+def listar_productos_global(db: Session = Depends(get_db)):
+    return db.query(service.models.Producto).all()
 
 @router.get("/microempresa/{id_microempresa}", response_model=list[schemas.ProductoResponse])
 def listar_productos_por_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
@@ -248,18 +233,19 @@ def listar_productos_activos(db: Session = Depends(get_db)):
 def listar_productos_inactivos(db: Session = Depends(get_db)):
     return db.query(service.models.Producto).filter(service.models.Producto.estado == False).all()
 
+# --- PRODUCTOS CON STOCK GLOBALES (Aquí estaba el error 500) ---
 @router.get("/con-stock", response_model=list[schemas.ProductoResponse])
 def listar_productos_con_stock(db: Session = Depends(get_db)):
-    productos = db.query(service.models.Producto).join(Stock, service.models.Producto.id_producto == Stock.id_producto).filter(Stock.cantidad > 0).all()
-    return productos
+    # CORREGIDO: Llama al servicio
+    return service.listar_productos_con_stock_global(db)
 
 @router.get("/sin-stock", response_model=list[schemas.ProductoResponse])
 def listar_productos_sin_stock(db: Session = Depends(get_db)):
-    productos = db.query(service.models.Producto).join(Stock, service.models.Producto.id_producto == Stock.id_producto).filter(Stock.cantidad == 0).all()
-    return productos
+    # CORREGIDO: Llama al servicio
+    return service.listar_productos_sin_stock_global(db)
 
 @router.get("/{id_producto}", response_model=schemas.ProductoResponse)
-def obtener_producto(id_producto: int, db: Session = Depends(get_db)):
+def obtener_producto_detalle(id_producto: int, db: Session = Depends(get_db)):
     producto = db.query(service.models.Producto).filter(service.models.Producto.id_producto == id_producto).first()
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -296,27 +282,27 @@ def listar_productos_sin_stock_por_microempresa(id_microempresa: int, db: Sessio
 
 @router.get("/catalogo/publico")
 def obtener_catalogo_portal(db: Session = Depends(get_db)):
-    # 1. Filtramos productos con stock > 0
-    # Nota: No necesitamos filtrar en el front si el back ya lo hace. Es más seguro.
-    productos = db.query(models.Producto).filter(models.Producto.stock > 0).all()
-
+    productos = db.query(service.models.Producto).filter(service.models.Producto.estado == True).all()
     return productos
 
-# --- PRODUCTOS ---
+# --- PRODUCTOS (Endpoints por URL con ID explícito) ---
 @router.post("/microempresas/{id_microempresa}/productos", response_model=schemas.ProductoResponse)
-def crear_producto(id_microempresa: int, producto: schemas.ProductoCreate = Body(...), db: Session = Depends(get_db)):
+def crear_producto_por_url(id_microempresa: int, producto: schemas.ProductoCreate = Body(...), db: Session = Depends(get_db)):
     return service.crear_producto(db, id_microempresa, producto)
 
 @router.get("/microempresas/{id_microempresa}/productos", response_model=list[schemas.ProductoResponse])
-def listar_productos(id_microempresa: int, id_categoria: int = Query(None), estado: bool = Query(None), db: Session = Depends(get_db)):
+def listar_productos_con_filtros(id_microempresa: int, id_categoria: int = Query(None), estado: bool = Query(None), db: Session = Depends(get_db)):
     return service.listar_productos(db, id_microempresa, id_categoria, estado)
 
 @router.get("/productos/{id_producto}", response_model=schemas.ProductoResponse)
-def obtener_producto(id_producto: int, db: Session = Depends(get_db)):
-    return service.obtener_producto(db, id_producto)
+def obtener_producto_por_id(id_producto: int, db: Session = Depends(get_db)):
+    producto = db.query(service.models.Producto).filter(service.models.Producto.id_producto == id_producto).first()
+    if not producto:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return producto
 
 @router.put("/productos/{id_producto}", response_model=schemas.ProductoResponse)
-def editar_producto(id_producto: int, producto: schemas.ProductoUpdate = Body(...), db: Session = Depends(get_db)):
+def editar_producto_por_id(id_producto: int, producto: schemas.ProductoUpdate = Body(...), db: Session = Depends(get_db)):
     return service.editar_producto(db, id_producto, producto)
 
 @router.patch("/productos/{id_producto}/estado", response_model=schemas.ProductoResponse)

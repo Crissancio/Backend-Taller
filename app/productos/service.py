@@ -2,6 +2,8 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 from datetime import datetime
 
+# --- FUNCIONES DE ESCRITURA (Crear/Editar/Eliminar) ---
+
 def crear_categoria(db: Session, id_microempresa: int, categoria: schemas.CategoriaCreate):
     existe = db.query(models.Categoria).filter(
         models.Categoria.id_microempresa == id_microempresa,
@@ -54,9 +56,6 @@ def baja_logica_categoria(db: Session, id_categoria: int):
             notif_service.crear_notificacion(db, notificacion)
     return db_categoria
 
-def listar_categorias(db: Session):
-    return db.query(models.Categoria).all()
-
 def crear_producto(db: Session, id_microempresa: int, producto: schemas.ProductoCreate):
     # Validar que la categoría pertenezca a la microempresa
     categoria = db.query(models.Categoria).filter(
@@ -66,6 +65,7 @@ def crear_producto(db: Session, id_microempresa: int, producto: schemas.Producto
     if not categoria:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="La categoría no pertenece a la microempresa.")
+    
     # Crear producto
     data = producto.dict()
     data["id_microempresa"] = id_microempresa
@@ -74,6 +74,7 @@ def crear_producto(db: Session, id_microempresa: int, producto: schemas.Producto
     db.add(db_producto)
     db.commit()
     db.refresh(db_producto)
+    
     # Crear registro en stock con cantidad = 0
     from app.inventario.models import Stock
     from app.inventario.service import crear_stock_inicial
@@ -89,57 +90,6 @@ def actualizar_producto(db: Session, id_producto: int, producto: schemas.Product
     db.commit()
     db.refresh(db_producto)
     return db_producto
-
-def baja_logica_producto(db: Session, id_producto: int):
-    db_producto = db.query(models.Producto).filter(models.Producto.id_producto == id_producto).first()
-    if db_producto:
-        db_producto.estado = False
-        db.commit()
-    return db_producto
-
-def listar_productos(db: Session, id_microempresa: int, id_categoria: int = None, estado: bool = None):
-    query = db.query(models.Producto).filter(models.Producto.id_microempresa == id_microempresa)
-    if id_categoria is not None:
-        query = query.filter(models.Producto.id_categoria == id_categoria)
-    if estado is not None:
-        query = query.filter(models.Producto.estado == estado)
-    return query.all()
-
-def listar_productos_por_microempresa(db: Session, id_microempresa: int):
-    return db.query(models.Producto).filter(models.Producto.id_microempresa == id_microempresa).all()
-
-def listar_productos_activos_con_stock_por_microempresa(db: Session, id_microempresa: int):
-    from app.inventario.models import Stock
-    return (
-        db.query(models.Producto)
-        .join(Stock, models.Producto.id_producto == Stock.id_producto)
-        .filter(models.Producto.id_microempresa == id_microempresa)
-        .filter(models.Producto.estado == True)
-        .filter(Stock.cantidad > 0)
-        .all()
-    )
-# service.py para productos y categorías
-def listar_productos_activos_por_microempresa(db: Session, id_microempresa: int):
-    return db.query(models.Producto).filter(
-        models.Producto.id_microempresa == id_microempresa,
-        models.Producto.estado == True
-    ).all()
-
-def listar_productos_inactivos_sin_stock_por_microempresa(db: Session, id_microempresa: int):
-    from app.inventario.models import Stock
-    return (
-        db.query(models.Producto)
-        .join(Stock, models.Producto.id_producto == Stock.id_producto)
-        .filter(models.Producto.id_microempresa == id_microempresa)
-        .filter(models.Producto.estado == False)
-        .filter(Stock.cantidad == 0)
-        .all()
-    )
-def filtrar_productos_por_microempresa_y_nombre(db: Session, id_microempresa: int, nombre: str):
-    return db.query(models.Producto).filter(
-        models.Producto.id_microempresa == id_microempresa,
-        models.Producto.nombre.ilike(f"%{nombre}%")
-    ).all()
 
 def activar_producto(db: Session, id_producto: int):
     db_producto = db.query(models.Producto).filter(models.Producto.id_producto == id_producto).first()
@@ -179,6 +129,17 @@ def eliminar_producto_fisico(db: Session, id_producto: int):
             notif_service.crear_notificacion(db, notificacion)
     return db_producto
 
+def baja_logica_producto(db: Session, id_producto: int):
+    db_producto = db.query(models.Producto).filter(models.Producto.id_producto == id_producto).first()
+    if db_producto:
+        db_producto.estado = False
+        db.commit()
+    return db_producto
+
+# --- FUNCIONES DE LECTURA (CATEGORÍAS) ---
+
+def listar_categorias(db: Session):
+    return db.query(models.Categoria).all()
 
 def listar_categorias_activas(db: Session, id_microempresa: int):
     return db.query(models.Categoria).filter(
@@ -186,8 +147,86 @@ def listar_categorias_activas(db: Session, id_microempresa: int):
         models.Categoria.activo == True
     ).all()
 
+def listar_todas_categorias_activas(db: Session):
+    """(NUEVO) Devuelve todas las categorías activas sin filtrar por empresa (Global)"""
+    return db.query(models.Categoria).filter(models.Categoria.activo == True).all()
+
 def listar_categorias_inactivas(db: Session):
     return db.query(models.Categoria).filter(models.Categoria.activo == False).all()
+
+# --- FUNCIONES DE LECTURA (PRODUCTOS) ---
+
+def listar_productos(db: Session, id_microempresa: int, id_categoria: int = None, estado: bool = None):
+    query = db.query(models.Producto).filter(models.Producto.id_microempresa == id_microempresa)
+    if id_categoria is not None:
+        query = query.filter(models.Producto.id_categoria == id_categoria)
+    if estado is not None:
+        query = query.filter(models.Producto.estado == estado)
+    return query.all()
+
+def listar_productos_por_microempresa(db: Session, id_microempresa: int):
+    return db.query(models.Producto).filter(models.Producto.id_microempresa == id_microempresa).all()
+
+def filtrar_productos_por_microempresa_y_nombre(db: Session, id_microempresa: int, nombre: str):
+    return db.query(models.Producto).filter(
+        models.Producto.id_microempresa == id_microempresa,
+        models.Producto.nombre.ilike(f"%{nombre}%")
+    ).all()
+
+# --- FUNCIONES DE PRODUCTOS CON STOCK (NUEVAS Y NECESARIAS PARA EVITAR ERRORES) ---
+
+def listar_productos_con_stock_global(db: Session):
+    """Devuelve productos de todo el sistema que tienen stock > 0"""
+    from app.inventario.models import Stock
+    return db.query(models.Producto).join(Stock, models.Producto.id_producto == Stock.id_producto).filter(Stock.cantidad > 0).all()
+
+def listar_productos_sin_stock_global(db: Session):
+    """Devuelve productos de todo el sistema que tienen stock = 0"""
+    from app.inventario.models import Stock
+    return db.query(models.Producto).join(Stock, models.Producto.id_producto == Stock.id_producto).filter(Stock.cantidad == 0).all()
+
+def listar_productos_portal_publico(db: Session, id_microempresa: int):
+    """Lógica del portal"""
+    from app.inventario.models import Stock
+    return (
+        db.query(models.Producto)
+        .join(Stock, models.Producto.id_producto == Stock.id_producto)
+        .filter(
+            models.Producto.id_microempresa == id_microempresa,
+            models.Producto.estado == True,
+            Stock.cantidad > 0 
+        )
+        .all()
+    )
+
+def listar_productos_activos_con_stock_por_microempresa(db: Session, id_microempresa: int):
+    from app.inventario.models import Stock
+    return (
+        db.query(models.Producto)
+        .join(Stock, models.Producto.id_producto == Stock.id_producto)
+        .filter(models.Producto.id_microempresa == id_microempresa)
+        .filter(models.Producto.estado == True)
+        .filter(Stock.cantidad > 0)
+        .all()
+    )
+
+def listar_productos_activos_por_microempresa(db: Session, id_microempresa: int):
+    return db.query(models.Producto).filter(
+        models.Producto.id_microempresa == id_microempresa,
+        models.Producto.estado == True
+    ).all()
+
+def listar_productos_inactivos_sin_stock_por_microempresa(db: Session, id_microempresa: int):
+    from app.inventario.models import Stock
+    return (
+        db.query(models.Producto)
+        .join(Stock, models.Producto.id_producto == Stock.id_producto)
+        .filter(models.Producto.id_microempresa == id_microempresa)
+        .filter(models.Producto.estado == False)
+        .filter(Stock.cantidad == 0)
+        .all()
+    )
+
 def listar_productos_con_stock_por_microempresa(db: Session, id_microempresa: int):
     from app.inventario.models import Stock
     return (
@@ -197,9 +236,9 @@ def listar_productos_con_stock_por_microempresa(db: Session, id_microempresa: in
         .filter(Stock.cantidad > 0)
         .all()
     )
+
 def buscar_productos_por_nombre_microempresa(db: Session, id_microempresa: int, nombre: str):
     return db.query(models.Producto).filter(
         models.Producto.id_microempresa == id_microempresa,
         models.Producto.nombre.ilike(f"%{nombre}%")
     ).all()
-

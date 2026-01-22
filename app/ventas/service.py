@@ -10,7 +10,10 @@ from app.notificaciones.schemas import NotificacionCreate
 from app.productos.models import Producto
 from app.clientes.models import Cliente
 
+# --- CRUD BÁSICO ---
+
 def crear_venta(db: Session, venta: schemas.VentaCreate):
+    """Crea una venta genérica (sin lógica de stock automática)"""
     db_venta = models.Venta(
         id_microempresa=venta.id_microempresa,
         id_cliente=venta.id_cliente,
@@ -53,8 +56,12 @@ def listar_ventas(db: Session):
 def obtener_venta(db: Session, id_venta: int):
     return db.query(models.Venta).filter(models.Venta.id_venta == id_venta).first()
 
+def listar_ventas_por_microempresa(db: Session, id_microempresa: int):
+    return db.query(models.Venta).filter(models.Venta.id_microempresa == id_microempresa).all()
+
+# --- PAGOS Y DETALLES ---
+
 def crear_pago_venta(db: Session, pago: schemas.PagoVentaCreate, id_venta: int):
-    from datetime import datetime
     db_pago = models.PagoVenta(
         id_venta=id_venta,
         metodo=pago.metodo,
@@ -73,9 +80,6 @@ def listar_pagos_venta(db: Session, id_venta: int):
 def listar_detalles_venta(db: Session, id_venta: int):
     return db.query(models.DetalleVenta).filter(models.DetalleVenta.id_venta == id_venta).all()
 
-def listar_ventas_por_microempresa(db: Session, id_microempresa: int):
-    return db.query(models.Venta).filter(models.Venta.id_microempresa == id_microempresa).all()
-
 def listar_pagos_por_microempresa(db: Session, id_microempresa: int):
     return (
         db.query(models.PagoVenta)
@@ -92,10 +96,13 @@ def listar_detalles_por_microempresa(db: Session, id_microempresa: int):
         .all()
     )
 
+# --- LÓGICA DE NEGOCIO AVANZADA (Presencial vs Online) ---
+
 def crear_venta_presencial(db: Session, id_microempresa: int, venta: schemas.VentaCreate):
-    from datetime import datetime
+    """Crea venta presencial, marca como PAGADA y descuenta stock inmediatamente"""
     # Calcular total automáticamente
     total = sum([d.cantidad * d.precio_unitario for d in venta.detalles])
+    
     db_venta = models.Venta(
         id_microempresa=id_microempresa,
         id_cliente=venta.id_cliente,
@@ -107,6 +114,7 @@ def crear_venta_presencial(db: Session, id_microempresa: int, venta: schemas.Ven
     db.add(db_venta)
     db.commit()
     db.refresh(db_venta)
+    
     # Crear detalles y descontar stock
     for det in venta.detalles:
         db_det = models.DetalleVenta(
@@ -117,41 +125,67 @@ def crear_venta_presencial(db: Session, id_microempresa: int, venta: schemas.Ven
             subtotal=det.cantidad * det.precio_unitario
         )
         db.add(db_det)
+        
         # Descontar stock
         stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
         if not stock:
             raise HTTPException(status_code=400, detail=f"No existe stock para el producto {det.id_producto}")
+        
         stock.cantidad -= det.cantidad
         stock.ultima_actualizacion = datetime.now()
         db.commit()
+        
         # Notificación si stock bajo
         if stock.cantidad <= stock.stock_minimo:
             producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
-            notif = NotificacionCreate(
-                id_microempresa=id_microempresa,
-                id_usuario=1,  # Ajustar según lógica de usuario
-                tipo="STOCK_BAJO",
-                mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo."
-            )
-            crear_notificacion(db, notif)
+            if producto:
+                notif = NotificacionCreate(
+                    id_microempresa=id_microempresa,
+                    id_usuario=1,  # Ajustar según lógica de usuario o dejar genérico
+                    tipo="STOCK_BAJO",
+                    mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo."
+                )
+                crear_notificacion(db, notif)
+                
     db.commit()
     db.refresh(db_venta)
     return db_venta
 
-def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data):
+def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data: dict):
+    """
+    Crea venta online:
+    1. Busca o crea cliente (CORREGIDO: ASIGNA ID_MICROEMPRESA)
+    2. Crea venta en estado PENDIENTE_PAGO.
+    3. NO descuenta stock (se hace al validar el pago).
+    """
     from datetime import datetime
     from app.clientes.models import Cliente
-    # Crear cliente
-    db_cliente = Cliente(**cliente_data)
-    db.add(db_cliente)
-    db.commit()
-    db.refresh(db_cliente)
-    # Calcular total automáticamente
-    total = sum([d.cantidad * d.precio_unitario for d in venta.detalles])
+    
+    # 1. Buscar o crear cliente
+    telefono = cliente_data.get("telefono")
+    
+    # Intentamos buscar al cliente por teléfono
+    db_cliente = db.query(Cliente).filter(Cliente.telefono == telefono).first()
+    
+    if not db_cliente:
+        # CORRECCIÓN: Inyectamos el id_microempresa de la venta al cliente nuevo
+        cliente_data["id_microempresa"] = venta.id_microempresa
+        cliente_data["fecha_creacion"] = datetime.now()
+        cliente_data["estado"] = True # Activo por defecto
+        
+        db_cliente = Cliente(**cliente_data)
+        db.add(db_cliente)
+        db.commit()
+        db.refresh(db_cliente)
+    
+    # 2. Calcular total automáticamente
+    total_calculado = sum([d.cantidad * d.precio_unitario for d in venta.detalles])
+
+    # 3. Crear Venta
     db_venta = models.Venta(
         id_microempresa=venta.id_microempresa,
         id_cliente=db_cliente.id_cliente,
-        total=total,
+        total=total_calculado, 
         estado="PENDIENTE_PAGO",
         tipo="ONLINE",
         fecha=datetime.now()
@@ -159,7 +193,8 @@ def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data):
     db.add(db_venta)
     db.commit()
     db.refresh(db_venta)
-    # Crear detalles (no descuenta stock)
+
+    # 4. Crear detalles
     for det in venta.detalles:
         db_det = models.DetalleVenta(
             id_venta=db_venta.id_venta,
@@ -169,6 +204,7 @@ def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data):
             subtotal=det.cantidad * det.precio_unitario
         )
         db.add(db_det)
+    
     db.commit()
     db.refresh(db_venta)
     return db_venta
@@ -188,37 +224,45 @@ def crear_pago_venta_pendiente(db: Session, id_venta: int, pago: schemas.PagoVen
     return db_pago
 
 def validar_pago_venta(db: Session, id_venta: int):
+    """Valida el pago y DESCUENTA EL STOCK"""
     from datetime import datetime
     venta = db.query(models.Venta).filter(models.Venta.id_venta == id_venta).first()
     if not venta:
         raise HTTPException(status_code=404, detail="Venta no encontrada")
-    # Cambiar estado de venta y pago
+    
+    # Cambiar estado de venta
     venta.estado = "PAGADA"
-    db.commit()
-    # Validar pago
+    
+    # Validar pago asociado si existe
     pago = db.query(models.PagoVenta).filter(models.PagoVenta.id_venta == id_venta).order_by(models.PagoVenta.fecha.desc()).first()
     if pago:
         pago.estado = "VALIDADO"
-        db.commit()
-    # Descontar stock y notificar si es necesario
+    
+    # Descontar stock
     detalles = db.query(models.DetalleVenta).filter(models.DetalleVenta.id_venta == id_venta).all()
+    
     for det in detalles:
         stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
-        if not stock:
-            raise HTTPException(status_code=400, detail=f"No existe stock para el producto {det.id_producto}")
-        stock.cantidad -= det.cantidad
-        stock.ultima_actualizacion = datetime.now()
-        db.commit()
-        if stock.cantidad <= stock.stock_minimo:
-            producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
-            notif = NotificacionCreate(
-                id_microempresa=venta.id_microempresa,
-                id_usuario=1,  # Ajustar según lógica de usuario
-                tipo="STOCK_BAJO",
-                mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo."
-            )
-            crear_notificacion(db, notif)
+        if stock:
+            stock.cantidad -= det.cantidad
+            stock.ultima_actualizacion = datetime.now()
+            
+            # Alerta stock bajo
+            if stock.cantidad <= stock.stock_minimo:
+                producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
+                if producto:
+                    notif = NotificacionCreate(
+                        id_microempresa=venta.id_microempresa,
+                        id_usuario=1,
+                        tipo="STOCK_BAJO",
+                        mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo."
+                    )
+                    crear_notificacion(db, notif)
+        else:
+             pass
+
     db.commit()
+    db.refresh(venta)
     return venta
 
 def rechazar_pago_venta(db: Session, id_venta: int):

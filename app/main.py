@@ -3,6 +3,7 @@ from fastapi import FastAPI, Depends, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+# --- IMPORTS DE ROUTERS ---
 from app.microempresas.router import router as microempresas_router
 from app.users.router import router as users_router
 from app.auth.router import router as auth_router
@@ -24,52 +25,51 @@ from app.notificaciones.router import router as notificaciones_router
 from app.notificaciones.websocket import router as notificaciones_ws_router
 from app.ventas.router import router as ventas_router
 
-from app.auth.base_user import Usuario  # sin SuperAdmin
-from app.auth.models import SuperAdmin
-from app.users.models import AdminMicroempresa, Vendedor
-from app.microempresas.models import Microempresa
-from app.planes.models import Plan
-from app.suscripciones.models import Suscripcion
+app = FastAPI(title="Sistoys Backend")
 
+# --- CONFIGURACIÓN DE CORS ---
+# Definimos los orígenes permitidos
+origins = [
+    "http://localhost:5173",    # Vite local
+    "http://127.0.0.1:5173",    # Vite IP local
+    "*"                         # (Opcional) Permitir todo durante desarrollo para evitar bloqueos
+]
 
-
-app = FastAPI()
-
-# Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], # Agregamos ambas variaciones por seguridad
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
+    allow_methods=["*"],        # Permitir todos los métodos (GET, POST, PUT, DELETE, etc.)
+    allow_headers=["*"],        # Permitir todos los headers (Authorization, Content-Type, etc.)
 )
-# -- IMAGENES 
+
+# --- ARCHIVOS ESTÁTICOS (IMÁGENES) ---
 # 1. Aseguramos que la carpeta exista para que no de error al arrancar
 os.makedirs("public/productos", exist_ok=True)
 
 # 2. Montamos la ruta "/public" para que sirva los archivos de la carpeta física "public"
 app.mount("/public", StaticFiles(directory="public"), name="public")
 
-
-# Ordenar routers para que Swagger muestre primero usuarios, luego roles, luego otros módulos
+# --- INCLUSIÓN DE ROUTERS ---
+# Orden lógico para la documentación de Swagger
+app.include_router(auth_router)
 app.include_router(users_router)
-app.include_router(clientes_router)
 app.include_router(superadmins_router)
 app.include_router(admins_router)
 app.include_router(vendedores_router)
 app.include_router(microempresas_router)
-app.include_router(planes_router)
-app.include_router(suscripciones_router)
-app.include_router(auth_router)
+app.include_router(clientes_router)
 app.include_router(productos_router)
 app.include_router(inventario_router)
-app.include_router(notificaciones_router)
 app.include_router(ventas_router)
+app.include_router(planes_router)
+app.include_router(suscripciones_router)
+app.include_router(notificaciones_router)
 
 # Habilitar WebSocket para notificaciones
 app.include_router(notificaciones_ws_router)
 
-# Ruta /login en la raíz, reutilizando la lógica de auth
+# --- LOGIN GLOBAL (Reutiliza lógica de Auth) ---
 @app.post("/login", response_model=TokenResponse, tags=["Auth"])
 def login_root(
     username: str = Form(..., description="Correo electrónico"),
@@ -81,7 +81,7 @@ def login_root(
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     return {"access_token": token}
 
-
+# --- EVENTO DE INICIO ---
 @app.on_event("startup")
 def startup_event():
     init_db()

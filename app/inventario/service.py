@@ -1,11 +1,24 @@
-# service.py para inventario (stock)
-
 from sqlalchemy.orm import Session
 from . import models, schemas
 from app.productos.models import Producto
+from datetime import datetime
+from fastapi import HTTPException
 
+# --- FUNCIÓN CORREGIDA ---
 def crear_stock(db: Session, stock: schemas.StockCreate):
-    from datetime import datetime
+    # 1. Verificar si ya existe un registro de stock para este producto
+    existente = db.query(models.Stock).filter(models.Stock.id_producto == stock.id_producto).first()
+    
+    if existente:
+        # 2. Si existe, lo actualizamos en lugar de intentar crear uno nuevo (evita el error 500)
+        for key, value in stock.dict(exclude_unset=True).items():
+            setattr(existente, key, value)
+        existente.ultima_actualizacion = datetime.now()
+        db.commit()
+        db.refresh(existente)
+        return existente
+    
+    # 3. Si no existe, creamos uno nuevo (comportamiento original)
     data = stock.dict()
     data["ultima_actualizacion"] = datetime.now()
     db_stock = models.Stock(**data)
@@ -40,7 +53,6 @@ def listar_stock_por_microempresa(db: Session, id_microempresa: int):
     return db.query(models.Stock).filter(models.Stock.id_producto.in_(productos_ids)).all()
 
 def crear_stock_inicial(db: Session, id_producto: int):
-    from datetime import datetime
     # Solo crear si no existe stock para ese producto
     existe = db.query(models.Stock).filter(models.Stock.id_producto == id_producto).first()
     if existe:
@@ -57,11 +69,12 @@ def crear_stock_inicial(db: Session, id_producto: int):
     return db_stock
 
 def registrar_stock_inicial(db: Session, id_producto: int, cantidad: int, stock_minimo: int = 0):
-    from datetime import datetime
     stock = db.query(models.Stock).filter(models.Stock.id_producto == id_producto).first()
+    
+    # Validacion opcional: solo permitir si es 0. Si prefieres que sobrescriba siempre, comenta estas lineas.
     if stock and stock.cantidad > 0:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail="El stock inicial solo puede registrarse si la cantidad actual es 0.")
+        raise HTTPException(status_code=400, detail="El stock ya tiene existencias. Use la función de ajuste o edición.")
+        
     if not stock:
         stock = models.Stock(
             id_producto=id_producto,
@@ -79,10 +92,8 @@ def registrar_stock_inicial(db: Session, id_producto: int, cantidad: int, stock_
     return stock
 
 def ajuste_stock(db: Session, id_producto: int, ajuste: int):
-    from datetime import datetime
     stock = db.query(models.Stock).filter(models.Stock.id_producto == id_producto).first()
     if not stock:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Stock no encontrado para el producto.")
     stock.cantidad += ajuste
     stock.ultima_actualizacion = datetime.now()
