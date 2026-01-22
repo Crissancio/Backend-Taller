@@ -33,8 +33,25 @@ def actualizar_stock(db: Session, id_stock: int, stock: schemas.StockUpdate):
         return None
     for key, value in stock.dict(exclude_unset=True).items():
         setattr(db_stock, key, value)
+    # Forzar que la cantidad nunca sea negativa
+    if db_stock.cantidad is not None and db_stock.cantidad < 0:
+        db_stock.cantidad = 0
     db.commit()
     db.refresh(db_stock)
+    # Notificación si el stock está igual o por debajo del mínimo
+    if db_stock.cantidad <= db_stock.stock_minimo:
+        producto = db.query(Producto).filter(Producto.id_producto == db_stock.id_producto).first()
+        if producto:
+            from app.notificaciones.service import crear_notificacion
+            # Buscar todos los admins de la microempresa
+            admins = db.execute("SELECT id_usuario FROM admin_microempresa WHERE id_microempresa = :idm", {"idm": producto.id_microempresa}).fetchall()
+            for admin in admins:
+                crear_notificacion(db, schemas.NotificacionCreate(
+                    id_microempresa=producto.id_microempresa,
+                    id_usuario=admin[0],
+                    tipo="stock_minimo",
+                    mensaje=f"El producto '{producto.nombre}' tiene stock igual o menor al mínimo definido ({db_stock.cantidad}/{db_stock.stock_minimo})"
+                ))
     return db_stock
 
 def baja_logica_stock(db: Session, id_stock: int):
@@ -96,9 +113,25 @@ def ajuste_stock(db: Session, id_producto: int, ajuste: int):
     if not stock:
         raise HTTPException(status_code=404, detail="Stock no encontrado para el producto.")
     stock.cantidad += ajuste
+    # Forzar que la cantidad nunca sea negativa
+    if stock.cantidad < 0:
+        stock.cantidad = 0
     stock.ultima_actualizacion = datetime.now()
     db.commit()
     db.refresh(stock)
+    # Notificación si el stock está igual o por debajo del mínimo
+    if stock.cantidad <= stock.stock_minimo:
+        producto = db.query(Producto).filter(Producto.id_producto == stock.id_producto).first()
+        if producto:
+            from app.notificaciones.service import crear_notificacion
+            admins = db.execute("SELECT id_usuario FROM admin_microempresa WHERE id_microempresa = :idm", {"idm": producto.id_microempresa}).fetchall()
+            for admin in admins:
+                crear_notificacion(db, schemas.NotificacionCreate(
+                    id_microempresa=producto.id_microempresa,
+                    id_usuario=admin[0],
+                    tipo="stock_minimo",
+                    mensaje=f"El producto '{producto.nombre}' tiene stock igual o menor al mínimo definido ({stock.cantidad}/{stock.stock_minimo})"
+                ))
     return stock
 
 def listar_stock_por_microempresa_con_alerta(db: Session, id_microempresa: int):

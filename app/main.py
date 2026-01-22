@@ -27,20 +27,20 @@ from app.ventas.router import router as ventas_router
 
 app = FastAPI(title="Sistoys Backend")
 
-# --- CONFIGURACIÓN DE CORS ---
-# Definimos los orígenes permitidos
+# --- CONFIGURACIÓN DE CORS (CORREGIDA) ---
+# IMPORTANTE: Al usar allow_credentials=True, NO se puede usar ["*"] en los orígenes.
+# Debes especificar explícitamente las URLs del frontend.
 origins = [
-    "http://localhost:5173",    # Vite local
-    "http://127.0.0.1:5173",    # Vite IP local
-    "*"                         # (Opcional) Permitir todo durante desarrollo para evitar bloqueos
+    "http://localhost:5173",    # Frontend local
+    "http://127.0.0.1:5173",    # Frontend local (IP)
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],        # Permitir todos los métodos (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"],        # Permitir todos los headers (Authorization, Content-Type, etc.)
+    allow_origins=origins,      # Usamos la lista explícita sin asteriscos
+    allow_credentials=True,     # Permitir cookies/tokens
+    allow_methods=["*"],        # Permitir todos los métodos (GET, POST, etc.)
+    allow_headers=["*"],        # Permitir todos los headers
 )
 
 # --- ARCHIVOS ESTÁTICOS (IMÁGENES) ---

@@ -139,13 +139,15 @@ def crear_venta_presencial(db: Session, id_microempresa: int, venta: schemas.Ven
         if stock.cantidad <= stock.stock_minimo:
             producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
             if producto:
-                notif = NotificacionCreate(
-                    id_microempresa=id_microempresa,
-                    id_usuario=1,  # Ajustar según lógica de usuario o dejar genérico
-                    tipo="STOCK_BAJO",
-                    mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo."
-                )
-                crear_notificacion(db, notif)
+                admins = db.execute("SELECT id_usuario FROM admin_microempresa WHERE id_microempresa = :idm", {"idm": id_microempresa}).fetchall()
+                for admin in admins:
+                    notif = NotificacionCreate(
+                        id_microempresa=id_microempresa,
+                        id_usuario=admin[0],
+                        tipo="STOCK_BAJO",
+                        mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo."
+                    )
+                    crear_notificacion(db, notif)
                 
     db.commit()
     db.refresh(db_venta)
@@ -232,11 +234,23 @@ def validar_pago_venta(db: Session, id_venta: int):
     
     # Cambiar estado de venta
     venta.estado = "PAGADA"
-    
+
     # Validar pago asociado si existe
     pago = db.query(models.PagoVenta).filter(models.PagoVenta.id_venta == id_venta).order_by(models.PagoVenta.fecha.desc()).first()
     if pago:
         pago.estado = "VALIDADO"
+
+    # Notificar a todos los admins de la microempresa sobre la validación del pago
+    from sqlalchemy import text
+    admins = db.execute(text("SELECT id_usuario FROM admin_microempresa WHERE id_microempresa = :idm"), {"idm": venta.id_microempresa}).fetchall()
+    for admin in admins:
+        notif = NotificacionCreate(
+            id_microempresa=venta.id_microempresa,
+            id_usuario=admin[0],
+            tipo="PAGO_VALIDADO",
+            mensaje=f"Se ha validado un pago para la venta #{venta.id_venta}."
+        )
+        crear_notificacion(db, notif)
     
     # Descontar stock
     detalles = db.query(models.DetalleVenta).filter(models.DetalleVenta.id_venta == id_venta).all()
@@ -251,13 +265,15 @@ def validar_pago_venta(db: Session, id_venta: int):
             if stock.cantidad <= stock.stock_minimo:
                 producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
                 if producto:
-                    notif = NotificacionCreate(
-                        id_microempresa=venta.id_microempresa,
-                        id_usuario=1,
-                        tipo="STOCK_BAJO",
-                        mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo."
-                    )
-                    crear_notificacion(db, notif)
+                    admins = db.execute("SELECT id_usuario FROM admin_microempresa WHERE id_microempresa = :idm", {"idm": venta.id_microempresa}).fetchall()
+                    for admin in admins:
+                        notif = NotificacionCreate(
+                            id_microempresa=venta.id_microempresa,
+                            id_usuario=admin[0],
+                            tipo="STOCK_BAJO",
+                            mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo."
+                        )
+                        crear_notificacion(db, notif)
         else:
              pass
 
