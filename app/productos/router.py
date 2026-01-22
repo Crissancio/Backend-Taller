@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Path, Body, Query
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from . import schemas, service
@@ -10,6 +10,23 @@ from app.notificaciones.schemas import NotificacionCreate
 from typing import Optional
 
 router = APIRouter(prefix="/productos", tags=["Productos"])
+
+# --- CATEGORÍAS ---
+@router.post("/microempresas/{id_microempresa}/categorias", response_model=schemas.CategoriaResponse)
+def crear_categoria(id_microempresa: int = Path(...), categoria: schemas.CategoriaCreate = Body(...), db: Session = Depends(get_db)):
+    return service.crear_categoria(db, id_microempresa, categoria)
+
+@router.get("/microempresas/{id_microempresa}/categorias", response_model=list[schemas.CategoriaResponse])
+def listar_categorias_activas(id_microempresa: int, db: Session = Depends(get_db)):
+    return service.listar_categorias_activas(db, id_microempresa)
+
+@router.put("/categorias/{id_categoria}", response_model=schemas.CategoriaResponse)
+def editar_categoria(id_categoria: int, categoria: schemas.CategoriaUpdate = Body(...), id_microempresa: int = Body(...), db: Session = Depends(get_db)):
+    return service.editar_categoria(db, id_categoria, id_microempresa, categoria)
+
+@router.patch("/categorias/{id_categoria}/estado", response_model=schemas.CategoriaResponse)
+def cambiar_estado_categoria(id_categoria: int, estado: bool = Body(...), id_microempresa: int = Body(...), db: Session = Depends(get_db)):
+    return service.cambiar_estado_categoria(db, id_categoria, id_microempresa, estado)
 
 # --- ENDPOINT DEL PORTAL (PÚBLICO) ---
 # Cumple el requerimiento: "Visible a cualquier usuario" y "Solo mostrar productos nuevos/con stock"
@@ -284,3 +301,24 @@ def obtener_catalogo_portal(db: Session = Depends(get_db)):
     productos = db.query(models.Producto).filter(models.Producto.stock > 0).all()
 
     return productos
+
+# --- PRODUCTOS ---
+@router.post("/microempresas/{id_microempresa}/productos", response_model=schemas.ProductoResponse)
+def crear_producto(id_microempresa: int, producto: schemas.ProductoCreate = Body(...), db: Session = Depends(get_db)):
+    return service.crear_producto(db, id_microempresa, producto)
+
+@router.get("/microempresas/{id_microempresa}/productos", response_model=list[schemas.ProductoResponse])
+def listar_productos(id_microempresa: int, id_categoria: int = Query(None), estado: bool = Query(None), db: Session = Depends(get_db)):
+    return service.listar_productos(db, id_microempresa, id_categoria, estado)
+
+@router.get("/productos/{id_producto}", response_model=schemas.ProductoResponse)
+def obtener_producto(id_producto: int, db: Session = Depends(get_db)):
+    return service.obtener_producto(db, id_producto)
+
+@router.put("/productos/{id_producto}", response_model=schemas.ProductoResponse)
+def editar_producto(id_producto: int, producto: schemas.ProductoUpdate = Body(...), db: Session = Depends(get_db)):
+    return service.editar_producto(db, id_producto, producto)
+
+@router.patch("/productos/{id_producto}/estado", response_model=schemas.ProductoResponse)
+def cambiar_estado_producto(id_producto: int, estado: bool = Body(...), db: Session = Depends(get_db)):
+    return service.cambiar_estado_producto(db, id_producto, estado)

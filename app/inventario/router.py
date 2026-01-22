@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from . import schemas, service
@@ -98,3 +98,17 @@ def obtener_stock_por_producto(id_producto: int, db: Session = Depends(get_db)):
     if not stock:
         raise HTTPException(status_code=404, detail="Stock no encontrado para el producto")
     return stock
+
+from fastapi import Body
+
+@router.post("/stock/inicial", response_model=schemas.StockResponse)
+def registrar_stock_inicial(id_producto: int = Body(...), cantidad: int = Body(...), stock_minimo: int = Body(0), db: Session = Depends(get_db)):
+    return service.registrar_stock_inicial(db, id_producto, cantidad, stock_minimo)
+
+@router.put("/stock/ajuste", response_model=schemas.StockResponse)
+def ajuste_stock(id_producto: int = Body(...), ajuste: int = Body(...), db: Session = Depends(get_db)):
+    return service.ajuste_stock(db, id_producto, ajuste)
+
+@router.get("/microempresas/{id_microempresa}/stock", response_model=list)
+def listar_stock_por_microempresa_con_alerta(id_microempresa: int, db: Session = Depends(get_db)):
+    return service.listar_stock_por_microempresa_con_alerta(db, id_microempresa)

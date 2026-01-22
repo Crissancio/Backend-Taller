@@ -19,7 +19,10 @@ from app.vendedores.router import router as vendedores_router
 from app.clientes.router import router as clientes_router
 from app.productos.router import router as productos_router
 from app.inventario.router import router as inventario_router
+
 from app.notificaciones.router import router as notificaciones_router
+from app.notificaciones.websocket import router as notificaciones_ws_router
+from app.ventas.router import router as ventas_router
 
 from app.auth.base_user import Usuario  # sin SuperAdmin
 from app.auth.models import SuperAdmin
@@ -61,6 +64,10 @@ app.include_router(auth_router)
 app.include_router(productos_router)
 app.include_router(inventario_router)
 app.include_router(notificaciones_router)
+app.include_router(ventas_router)
+
+# Habilitar WebSocket para notificaciones
+app.include_router(notificaciones_ws_router)
 
 # Ruta /login en la raíz, reutilizando la lógica de auth
 @app.post("/login", response_model=TokenResponse, tags=["Auth"])

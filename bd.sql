@@ -232,3 +232,39 @@ CREATE TABLE notificacion (
 );
 
 
+/*------OTRAS NUEVAS TABLAS------*/
+CREATE TABLE venta (
+    id_venta SERIAL PRIMARY KEY,
+    id_microempresa INT NOT NULL,
+    id_cliente INT,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    total DECIMAL(10,2) NOT NULL,
+    estado VARCHAR(20) NOT NULL,
+    tipo VARCHAR(20) NOT NULL,
+
+    FOREIGN KEY (id_microempresa) REFERENCES microempresas(id_microempresa),
+    FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente)
+);
+
+CREATE TABLE detalle_venta (
+    id_detalle SERIAL PRIMARY KEY,
+    id_venta INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+
+    FOREIGN KEY (id_venta) REFERENCES venta(id_venta),
+    FOREIGN KEY (id_producto) REFERENCES producto(id_producto)
+);
+
+CREATE TABLE pago_venta (
+    id_pago SERIAL PRIMARY KEY,
+    id_venta INT NOT NULL,
+    metodo VARCHAR(30) NOT NULL,
+    comprobante_url TEXT,
+    estado VARCHAR(20) NOT NULL,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (id_venta) REFERENCES venta(id_venta)
+);

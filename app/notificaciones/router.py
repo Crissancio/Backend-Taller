@@ -45,3 +45,11 @@ def obtener_notificacion(id_notificacion: int, db: Session = Depends(get_db)):
     if not notificacion:
         raise HTTPException(status_code=404, detail="Notificación no encontrada")
     return notificacion
+
+@router.get("/microempresas/{id_microempresa}/notificaciones", response_model=list[schemas.NotificacionResponse])
+def listar_notificaciones_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    return service.listar_notificaciones_microempresa(db, id_microempresa)
+
+@router.patch("/notificaciones/{id_notificacion}/leida", response_model=schemas.NotificacionResponse)
+def marcar_notificacion_leida(id_notificacion: int, db: Session = Depends(get_db)):
+    return service.marcar_notificacion_leida(db, id_notificacion)

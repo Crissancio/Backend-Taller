@@ -1,18 +1,22 @@
-
 from sqlalchemy.orm import Session
 from . import models, schemas
 from datetime import datetime
 
-def crear_categoria(db: Session, categoria: schemas.CategoriaCreate):
-    # Validar unicidad antes de crear
+def crear_categoria(db: Session, id_microempresa: int, categoria: schemas.CategoriaCreate):
     existe = db.query(models.Categoria).filter(
-        models.Categoria.id_microempresa == categoria.id_microempresa,
+        models.Categoria.id_microempresa == id_microempresa,
         models.Categoria.nombre == categoria.nombre
     ).first()
     if existe:
         from fastapi import HTTPException
-        raise HTTPException(status_code=409, detail="Ya existe una categoría con ese nombre para esta microempresa.")
-    db_categoria = models.Categoria(**categoria.dict(), fecha_creacion=datetime.now())
+        raise HTTPException(status_code=409, detail="Ya existe una categoría con ese nombre en la microempresa.")
+    db_categoria = models.Categoria(
+        id_microempresa=id_microempresa,
+        nombre=categoria.nombre,
+        descripcion=categoria.descripcion,
+        activo=True,
+        fecha_creacion=datetime.now()
+    )
     db.add(db_categoria)
     db.commit()
     db.refresh(db_categoria)
@@ -29,23 +33,51 @@ def actualizar_categoria(db: Session, id_categoria: int, categoria: schemas.Cate
     return db_categoria
 
 def baja_logica_categoria(db: Session, id_categoria: int):
+    from app.notificaciones import service as notif_service
+    from app.notificaciones.schemas import NotificacionCreate
+    from app.users.models import AdminMicroempresa
     db_categoria = db.query(models.Categoria).filter(models.Categoria.id_categoria == id_categoria).first()
     if db_categoria:
+        id_microempresa = db_categoria.id_microempresa
+        nombre_categoria = db_categoria.nombre
         db_categoria.activo = False
         db.commit()
+        # Notificar al admin de la microempresa
+        admin = db.query(AdminMicroempresa).filter(AdminMicroempresa.id_microempresa == id_microempresa).first()
+        if admin:
+            notificacion = NotificacionCreate(
+                id_microempresa=id_microempresa,
+                id_usuario=admin.id_usuario,
+                tipo="categoria",
+                mensaje=f"La categoría '{nombre_categoria}' ha sido eliminada (baja lógica)."
+            )
+            notif_service.crear_notificacion(db, notificacion)
     return db_categoria
 
 def listar_categorias(db: Session):
     return db.query(models.Categoria).all()
 
-def crear_producto(db: Session, producto: schemas.ProductoCreate):
-    from datetime import datetime
+def crear_producto(db: Session, id_microempresa: int, producto: schemas.ProductoCreate):
+    # Validar que la categoría pertenezca a la microempresa
+    categoria = db.query(models.Categoria).filter(
+        models.Categoria.id_categoria == producto.id_categoria,
+        models.Categoria.id_microempresa == id_microempresa
+    ).first()
+    if not categoria:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="La categoría no pertenece a la microempresa.")
+    # Crear producto
     data = producto.dict()
+    data["id_microempresa"] = id_microempresa
     data["fecha_creacion"] = datetime.now()
     db_producto = models.Producto(**data)
     db.add(db_producto)
     db.commit()
     db.refresh(db_producto)
+    # Crear registro en stock con cantidad = 0
+    from app.inventario.models import Stock
+    from app.inventario.service import crear_stock_inicial
+    crear_stock_inicial(db, db_producto.id_producto)
     return db_producto
 
 def actualizar_producto(db: Session, id_producto: int, producto: schemas.ProductoUpdate):
@@ -65,8 +97,13 @@ def baja_logica_producto(db: Session, id_producto: int):
         db.commit()
     return db_producto
 
-def listar_productos(db: Session):
-    return db.query(models.Producto).all()
+def listar_productos(db: Session, id_microempresa: int, id_categoria: int = None, estado: bool = None):
+    query = db.query(models.Producto).filter(models.Producto.id_microempresa == id_microempresa)
+    if id_categoria is not None:
+        query = query.filter(models.Producto.id_categoria == id_categoria)
+    if estado is not None:
+        query = query.filter(models.Producto.estado == estado)
+    return query.all()
 
 def listar_productos_por_microempresa(db: Session, id_microempresa: int):
     return db.query(models.Producto).filter(models.Producto.id_microempresa == id_microempresa).all()
@@ -121,15 +158,33 @@ def desactivar_producto(db: Session, id_producto: int):
     return db_producto
 
 def eliminar_producto_fisico(db: Session, id_producto: int):
+    from app.notificaciones import service as notif_service
+    from app.notificaciones.schemas import NotificacionCreate
+    from app.users.models import AdminMicroempresa
     db_producto = db.query(models.Producto).filter(models.Producto.id_producto == id_producto).first()
     if db_producto:
+        id_microempresa = db_producto.id_microempresa
+        nombre_producto = db_producto.nombre
         db.delete(db_producto)
         db.commit()
+        # Notificar al admin de la microempresa
+        admin = db.query(AdminMicroempresa).filter(AdminMicroempresa.id_microempresa == id_microempresa).first()
+        if admin:
+            notificacion = NotificacionCreate(
+                id_microempresa=id_microempresa,
+                id_usuario=admin.id_usuario,
+                tipo="producto",
+                mensaje=f"El producto '{nombre_producto}' ha sido eliminado permanentemente."
+            )
+            notif_service.crear_notificacion(db, notificacion)
     return db_producto
 
 
-def listar_categorias_activas(db: Session):
-    return db.query(models.Categoria).filter(models.Categoria.activo == True).all()
+def listar_categorias_activas(db: Session, id_microempresa: int):
+    return db.query(models.Categoria).filter(
+        models.Categoria.id_microempresa == id_microempresa,
+        models.Categoria.activo == True
+    ).all()
 
 def listar_categorias_inactivas(db: Session):
     return db.query(models.Categoria).filter(models.Categoria.activo == False).all()
