@@ -52,10 +52,11 @@ def listar_productos_portal_publico(id_microempresa: int, db: Session = Depends(
 @router.get("/microempresa/{id_microempresa}/buscar", response_model=list[schemas.ProductoResponse])
 def filtrar_productos_por_microempresa_y_nombre(id_microempresa: int, nombre: str, db: Session = Depends(get_db)):
     return service.filtrar_productos_por_microempresa_y_nombre(db, id_microempresa, nombre)
-
+'''
 @router.get("/categoria/activas", response_model=list[schemas.CategoriaResponse])
 def listar_categorias_activas(db: Session = Depends(get_db)):
     return service.listar_categorias_activas(db)
+'''
 
 @router.get("/categoria/inactivas", response_model=list[schemas.CategoriaResponse])
 def listar_categorias_inactivas(db: Session = Depends(get_db)):

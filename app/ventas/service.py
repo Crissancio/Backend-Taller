@@ -138,28 +138,60 @@ def crear_venta_presencial(db: Session, id_microempresa: int, venta: schemas.Ven
     db.refresh(db_venta)
     return db_venta
 
-def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data):
-    from datetime import datetime
-    from app.clientes.models import Cliente
-    # Crear cliente
-    db_cliente = Cliente(**cliente_data)
-    db.add(db_cliente)
-    db.commit()
-    db.refresh(db_cliente)
-    # Calcular total automáticamente
-    total = sum([d.cantidad * d.precio_unitario for d in venta.detalles])
+def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data: dict):
+    from app.clientes.models import Cliente  # Importación local para evitar ciclos
+    
+    # 1. Extraer datos del diccionario de forma segura
+    id_empresa = cliente_data.get("id_microempresa")
+    doc_cliente = cliente_data.get("documento")
+    
+    # 2. BUSCAR SI EL CLIENTE YA EXISTE (Lógica inteligente)
+    cliente_existente = db.query(Cliente).filter(
+        Cliente.id_microempresa == id_empresa,
+        Cliente.documento == doc_cliente
+    ).first()
+
+    if cliente_existente:
+        # Si existe, actualizamos sus datos de contacto
+        cliente_existente.telefono = cliente_data.get("telefono")
+        cliente_existente.email = cliente_data.get("email")
+        cliente_existente.nombre = cliente_data.get("nombre") # Actualizar nombre también por si acaso
+        
+        id_cliente_final = cliente_existente.id_cliente
+    else:
+        # Si no existe, lo creamos manualmente mapeando los campos
+        nuevo_cliente = Cliente(
+            id_microempresa=id_empresa,
+            nombre=cliente_data.get("nombre"),
+            documento=doc_cliente,
+            telefono=cliente_data.get("telefono"),
+            email=cliente_data.get("email"),
+            fecha_creacion=cliente_data.get("fecha_creacion"),
+            estado=True
+        )
+        db.add(nuevo_cliente)
+        db.flush() # Para obtener el ID
+        id_cliente_final = nuevo_cliente.id_cliente
+
+    # 3. CREAR LA VENTA
+    # Calcular total desde el backend para seguridad (opcional, pero recomendado)
+    total_calculado = 0
+    # Usamos venta.detalles porque 'venta' SÍ es un objeto Schema (no un dict)
+    for d in venta.detalles:
+        total_calculado += (d.cantidad * d.precio_unitario)
+
     db_venta = models.Venta(
-        id_microempresa=venta.id_microempresa,
-        id_cliente=db_cliente.id_cliente,
-        total=total,
+        id_microempresa=id_empresa,
+        id_cliente=id_cliente_final,
+        total=total_calculado, # Usamos el calculado o venta.total
         estado="PENDIENTE_PAGO",
         tipo="ONLINE",
         fecha=datetime.now()
     )
     db.add(db_venta)
-    db.commit()
-    db.refresh(db_venta)
-    # Crear detalles (no descuenta stock)
+    db.flush()
+
+    # 4. CREAR DETALLES
     for det in venta.detalles:
         db_det = models.DetalleVenta(
             id_venta=db_venta.id_venta,
@@ -169,6 +201,7 @@ def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data):
             subtotal=det.cantidad * det.precio_unitario
         )
         db.add(db_det)
+
     db.commit()
     db.refresh(db_venta)
     return db_venta
