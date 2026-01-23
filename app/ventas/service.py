@@ -13,7 +13,6 @@ from app.clientes.models import Cliente
 # --- CRUD BÁSICO ---
 
 def crear_venta(db: Session, venta: schemas.VentaCreate):
-    """Crea una venta genérica (sin lógica de stock automática)"""
     db_venta = models.Venta(
         id_microempresa=venta.id_microempresa,
         id_cliente=venta.id_cliente,
@@ -35,7 +34,7 @@ def crear_venta(db: Session, venta: schemas.VentaCreate):
             subtotal=det.subtotal
         )
         db.add(db_det)
-    # Crear pagos si existen
+    # Crear pagos 
     if venta.pagos:
         for pag in venta.pagos:
             db_pag = models.PagoVenta(
@@ -57,7 +56,7 @@ def obtener_venta(db: Session, id_venta: int):
     return db.query(models.Venta).filter(models.Venta.id_venta == id_venta).first()
 
 def listar_ventas_por_microempresa(db: Session, id_microempresa: int):
-    return db.query(models.Venta).filter(models.Venta.id_microempresa == id_microempresa).all()
+    return db.query(models.Venta).filter(models.Venta.id_microempresa == id_microempresa).order_by(models.Venta.fecha.desc()).all()
 
 # --- PAGOS Y DETALLES ---
 
@@ -235,7 +234,7 @@ def validar_pago_venta(db: Session, id_venta: int):
     # Cambiar estado de venta
     venta.estado = "PAGADA"
 
-    # Validar pago asociado si existe
+    # Validar pago asociado 
     pago = db.query(models.PagoVenta).filter(models.PagoVenta.id_venta == id_venta).order_by(models.PagoVenta.fecha.desc()).first()
     if pago:
         pago.estado = "VALIDADO"

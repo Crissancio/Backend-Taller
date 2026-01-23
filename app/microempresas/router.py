@@ -146,19 +146,11 @@ def listar_microempresas_inactivas(db: Session = Depends(get_db), user=Depends(g
 # --- CRUD MICROEMPRESA (restricciones) ---
 # OBTENER
 @router.get("/{id_microempresa}", response_model=schemas.MicroempresaResponse)
-def obtener_microempresa(id_microempresa: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    rol = get_user_role(user, db)
-    micro = db.query(service.models.Microempresa).filter_by(id_microempresa=id_microempresa, estado=True).first()
-    if not micro:
-        raise HTTPException(status_code=404, detail="Microempresa no encontrada")
-    if rol == 'superadmin':
-        return micro
-    elif rol == 'adminmicroempresa' and hasattr(user, 'admin_microempresa') and user.admin_microempresa and user.admin_microempresa.id_microempresa == id_microempresa:
-        return micro
-    elif rol == 'vendedor' and hasattr(user, 'vendedor') and user.vendedor and user.vendedor.id_microempresa == id_microempresa:
-        return micro
-    else:
-        raise HTTPException(status_code=403, detail="No autorizado")
+def obtener_microempresa(id_microempresa: int, db: Session = Depends(get_db)): 
+    micro = db.query(service.models.Microempresa).filter_by(id_microempresa=id_microempresa, estado=True).first() 
+    if not micro: 
+        raise HTTPException(status_code=404, detail="Microempresa no encontrada") 
+    return micro 
 
 # ACTUALIZAR (solo superadmin o admin de esa microempresa)
 @router.put("/{id_microempresa}", response_model=schemas.MicroempresaResponse)
