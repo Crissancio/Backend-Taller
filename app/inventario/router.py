@@ -77,12 +77,11 @@ def baja_logica_stock(id_stock: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Stock no encontrado")
     return result
 
-@router.get("/", response_model=list[schemas.StockResponse])
-def listar_stock(db: Session = Depends(get_db)):
-    return service.listar_stock(db)
+
 
 @router.get("/microempresa/{id_microempresa}", response_model=list[schemas.StockResponse])
 def listar_stock_por_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    # Solo admins pueden consultar el stock de su microempresa
     return service.listar_stock_por_microempresa(db, id_microempresa)
 
 @router.get("/{id_stock}", response_model=schemas.StockResponse)
@@ -111,4 +110,5 @@ def ajuste_stock(id_producto: int = Body(...), ajuste: int = Body(...), db: Sess
 
 @router.get("/microempresas/{id_microempresa}/stock", response_model=list)
 def listar_stock_por_microempresa_con_alerta(id_microempresa: int, db: Session = Depends(get_db)):
+    # Solo admins pueden consultar el stock de su microempresa
     return service.listar_stock_por_microempresa_con_alerta(db, id_microempresa)

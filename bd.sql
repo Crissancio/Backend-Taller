@@ -231,8 +231,6 @@ CREATE TABLE notificacion (
         REFERENCES usuario(id_usuario)
 );
 
-
-/*------OTRAS NUEVAS TABLAS------*/
 CREATE TABLE venta (
     id_venta SERIAL PRIMARY KEY,
     id_microempresa INT NOT NULL,
@@ -268,3 +266,122 @@ CREATE TABLE pago_venta (
 
     FOREIGN KEY (id_venta) REFERENCES venta(id_venta)
 );
+
+
+/*--------------NUEVAS TABLAS--------*/
+CREATE TABLE proveedor (
+    id_proveedor SERIAL PRIMARY KEY,
+    id_microempresa INTEGER NOT NULL,
+
+    nombre VARCHAR(150) NOT NULL,
+    contacto VARCHAR(150),
+    email VARCHAR(150),
+    estado BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_registro TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_proveedor_microempresa
+        FOREIGN KEY (id_microempresa)
+        REFERENCES microempresas(id_microempresa)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE proveedor_metodo_pago (
+    id_metodo_pago SERIAL PRIMARY KEY,
+    id_proveedor INTEGER NOT NULL,
+
+    tipo VARCHAR(50) NOT NULL, 
+    -- EJ: CUENTA_BANCARIA, QR, EFECTIVO, PASARELA
+
+    descripcion TEXT,
+    datos_pago TEXT,      
+    -- Nº cuenta, link pasarela, identificador, etc
+
+    qr_imagen TEXT,       
+    -- Ruta o URL del QR (opcional)
+
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+
+    CONSTRAINT fk_metodo_pago_proveedor
+        FOREIGN KEY (id_proveedor)
+        REFERENCES proveedor(id_proveedor)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE proveedor_producto (
+    id_proveedor INTEGER NOT NULL,
+    id_producto INTEGER NOT NULL,
+
+    precio_referencia NUMERIC(10,2),
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+
+    PRIMARY KEY (id_proveedor, id_producto),
+
+    CONSTRAINT fk_pp_proveedor
+        FOREIGN KEY (id_proveedor)
+        REFERENCES proveedor(id_proveedor)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_pp_producto
+        FOREIGN KEY (id_producto)
+        REFERENCES producto(id_producto)
+        ON DELETE CASCADE
+);
+
+
+CREATE TABLE compra (
+    id_compra SERIAL PRIMARY KEY,
+    id_microempresa INTEGER NOT NULL,
+    id_proveedor INTEGER NOT NULL,
+
+    fecha TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    total NUMERIC(10,2) NOT NULL,
+    estado VARCHAR(20) NOT NULL DEFAULT 'REGISTRADA',
+    observacion TEXT,
+
+    CONSTRAINT fk_compra_microempresa
+        FOREIGN KEY (id_microempresa)
+        REFERENCES microempresas(id_microempresa),
+
+    CONSTRAINT fk_compra_proveedor
+        FOREIGN KEY (id_proveedor)
+        REFERENCES proveedor(id_proveedor)
+);
+
+CREATE TABLE detalle_compra (
+    id_detalle_compra SERIAL PRIMARY KEY,
+    id_compra INTEGER NOT NULL,
+    id_producto INTEGER NOT NULL,
+
+    cantidad INTEGER NOT NULL,
+    precio_unitario NUMERIC(10,2) NOT NULL,
+    subtotal NUMERIC(10,2) NOT NULL,
+
+    CONSTRAINT fk_detalle_compra_compra
+        FOREIGN KEY (id_compra)
+        REFERENCES compra(id_compra)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_detalle_compra_producto
+        FOREIGN KEY (id_producto)
+        REFERENCES producto(id_producto)
+);
+
+CREATE TABLE pago_compra (
+    id_pago SERIAL PRIMARY KEY,
+    id_compra INTEGER NOT NULL,
+    id_metodo_pago INTEGER,
+
+    monto NUMERIC(10,2) NOT NULL,
+    comprobante_url TEXT,
+    fecha TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_pago_compra
+        FOREIGN KEY (id_compra)
+        REFERENCES compra(id_compra)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_pago_metodo
+        FOREIGN KEY (id_metodo_pago)
+        REFERENCES proveedor_metodo_pago(id_metodo_pago)
+);
+
