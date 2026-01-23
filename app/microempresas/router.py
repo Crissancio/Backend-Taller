@@ -145,12 +145,14 @@ def listar_microempresas_inactivas(db: Session = Depends(get_db), user=Depends(g
     # This subscription route has been removed as there is a dedicated module for subscriptions.
 # --- CRUD MICROEMPRESA (restricciones) ---
 # OBTENER
+
+# Ruta pública: Obtener microempresa por id (sin restricciones de autenticación ni autorización)
 @router.get("/{id_microempresa}", response_model=schemas.MicroempresaResponse)
-def obtener_microempresa(id_microempresa: int, db: Session = Depends(get_db)): 
-    micro = db.query(service.models.Microempresa).filter_by(id_microempresa=id_microempresa, estado=True).first() 
-    if not micro: 
-        raise HTTPException(status_code=404, detail="Microempresa no encontrada") 
-    return micro 
+def obtener_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    micro = db.query(service.models.Microempresa).filter_by(id_microempresa=id_microempresa, estado=True).first()
+    if not micro:
+        raise HTTPException(status_code=404, detail="Microempresa no encontrada")
+    return micro
 
 # ACTUALIZAR (solo superadmin o admin de esa microempresa)
 @router.put("/{id_microempresa}", response_model=schemas.MicroempresaResponse)
