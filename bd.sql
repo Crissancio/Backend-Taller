@@ -142,3 +142,129 @@ CREATE TABLE cliente (
 -- Índices para suscripciones
 CREATE INDEX ix_suscripciones_id_microempresa ON suscripciones (id_microempresa);
 CREATE INDEX ix_suscripciones_id_plan ON suscripciones (id_plan);
+
+/*------NUEVAS TABLAS--------*/
+CREATE TABLE categoria (
+    id_categoria SERIAL PRIMARY KEY,
+    id_microempresa INTEGER NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_categoria_microempresa
+        FOREIGN KEY (id_microempresa)
+        REFERENCES microempresas(id_microempresa)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_categoria_microempresa_nombre
+        UNIQUE (id_microempresa, nombre)
+);
+
+
+
+CREATE TABLE producto (
+    id_producto SERIAL PRIMARY KEY,
+    id_microempresa INTEGER NOT NULL,  -- tenant
+    id_categoria INTEGER NOT NULL,
+
+    nombre VARCHAR(150) NOT NULL,
+    descripcion TEXT,
+
+    precio_venta NUMERIC(10,2) NOT NULL,
+    costo_compra NUMERIC(10,2),
+
+    codigo VARCHAR(50),
+    imagen TEXT,
+
+    estado BOOLEAN NOT NULL DEFAULT TRUE,
+
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_producto_microempresa
+        FOREIGN KEY (id_microempresa)
+        REFERENCES microempresas(id_microempresa)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_producto_categoria
+        FOREIGN KEY (id_categoria)
+        REFERENCES categoria(id_categoria)
+);
+
+
+
+CREATE TABLE stock (
+    id_stock SERIAL PRIMARY KEY,
+    id_producto INTEGER NOT NULL,
+
+    cantidad INTEGER NOT NULL DEFAULT 0,
+    stock_minimo INTEGER NOT NULL DEFAULT 0,
+
+    ultima_actualizacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_stock_producto
+        FOREIGN KEY (id_producto)
+        REFERENCES producto(id_producto)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_stock_producto
+        UNIQUE (id_producto)
+);
+
+CREATE TABLE notificacion (
+    id_notificacion SERIAL PRIMARY KEY,
+    id_microempresa INTEGER NOT NULL,
+    id_usuario INTEGER NOT NULL,
+
+    tipo VARCHAR(50), -- STOCK_BAJO, SIN_STOCK
+    mensaje TEXT NOT NULL,
+
+    leido BOOLEAN NOT NULL DEFAULT FALSE,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_notificacion_microempresa
+        FOREIGN KEY (id_microempresa)
+        REFERENCES microempresas(id_microempresa),
+
+    CONSTRAINT fk_notificacion_usuario
+        FOREIGN KEY (id_usuario)
+        REFERENCES usuario(id_usuario)
+);
+
+
+/*------OTRAS NUEVAS TABLAS------*/
+CREATE TABLE venta (
+    id_venta SERIAL PRIMARY KEY,
+    id_microempresa INT NOT NULL,
+    id_cliente INT,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    total DECIMAL(10,2) NOT NULL,
+    estado VARCHAR(20) NOT NULL,
+    tipo VARCHAR(20) NOT NULL,
+
+    FOREIGN KEY (id_microempresa) REFERENCES microempresas(id_microempresa),
+    FOREIGN KEY (id_cliente) REFERENCES cliente(id_cliente)
+);
+
+CREATE TABLE detalle_venta (
+    id_detalle SERIAL PRIMARY KEY,
+    id_venta INT NOT NULL,
+    id_producto INT NOT NULL,
+    cantidad INT NOT NULL,
+    precio_unitario DECIMAL(10,2) NOT NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+
+    FOREIGN KEY (id_venta) REFERENCES venta(id_venta),
+    FOREIGN KEY (id_producto) REFERENCES producto(id_producto)
+);
+
+CREATE TABLE pago_venta (
+    id_pago SERIAL PRIMARY KEY,
+    id_venta INT NOT NULL,
+    metodo VARCHAR(30) NOT NULL,
+    comprobante_url TEXT,
+    estado VARCHAR(20) NOT NULL,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (id_venta) REFERENCES venta(id_venta)
+);

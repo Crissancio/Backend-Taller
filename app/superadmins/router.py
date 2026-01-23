@@ -20,13 +20,15 @@ class SuperAdminUpdate(BaseModel):
 # Listar superadmins SOLO aquí
 @router.get("/", response_model=list[UsuarioResponse])
 def listar_superadmins(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    if get_user_role(user, db) != 'superadmin':
+    rol = get_user_role(user, db)
+    if rol != 'superadmin':
         raise HTTPException(status_code=403, detail="Solo superadmins pueden ver esta información")
     return [sa.usuario for sa in db.query(SuperAdmin).all()]
 
 @router.get("/{id_usuario}", response_model=UsuarioResponse)
 def obtener_superadmin(id_usuario: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    if get_user_role(user, db) != 'superadmin':
+    rol = get_user_role(user, db)
+    if rol != 'superadmin':
         raise HTTPException(status_code=403, detail="Solo superadmins pueden ver esta información")
     superadmin = db.query(SuperAdmin).filter_by(id_usuario=id_usuario).first()
     if not superadmin:
@@ -35,7 +37,8 @@ def obtener_superadmin(id_usuario: int, db: Session = Depends(get_db), user=Depe
 
 @router.delete("/{id_usuario}")
 def eliminar_superadmin(id_usuario: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    if get_user_role(user, db) != 'superadmin':
+    rol = get_user_role(user, db)
+    if rol != 'superadmin':
         raise HTTPException(status_code=403, detail="Solo superadmins pueden eliminar superadmins")
     superadmin = db.query(SuperAdmin).filter_by(id_usuario=id_usuario).first()
     if not superadmin:
@@ -46,7 +49,8 @@ def eliminar_superadmin(id_usuario: int, db: Session = Depends(get_db), user=Dep
 
 @router.put("/{id_usuario}", response_model=UsuarioResponse)
 def actualizar_superadmin(id_usuario: int, data: SuperAdminUpdate, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    if get_user_role(user, db) != 'superadmin':
+    rol = get_user_role(user, db)
+    if rol != 'superadmin':
         raise HTTPException(status_code=403, detail="Solo superadmins pueden actualizar superadmins")
     superadmin = db.query(SuperAdmin).filter_by(id_usuario=id_usuario).first()
     if not superadmin:

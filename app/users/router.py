@@ -17,13 +17,15 @@ from app.core.dependencies import get_user_role
 @router.get("/me", response_model=schemas.UsuarioResponse)
 def get_me(user=Depends(get_current_user), db: Session = Depends(get_db)):
     rol = get_user_role(user, db)
-    # Construir la respuesta incluyendo el rol
+    # Solo usar los roles canónicos
+    if rol not in ["superadmin", "adminmicroempresa", "vendedor", "usuario"]:
+        rol = "usuario"
     return {
         "id_usuario": user.id_usuario,
         "nombre": user.nombre,
         "email": user.email,
         "estado": user.estado,
-        "rol": rol or "usuario"
+        "rol": rol
     }
 
 # CRUD BÁSICO DE USUARIOS
@@ -34,7 +36,7 @@ def get_me(user=Depends(get_current_user), db: Session = Depends(get_db)):
 def crear_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
     try:
         nuevo_usuario = service.crear_usuario(db, usuario)
-        # Construir la respuesta agregando el rol por defecto
+        # Construir la respuesta agregando el rol por defecto canónico
         return {
             "id_usuario": nuevo_usuario.id_usuario,
             "nombre": nuevo_usuario.nombre,
@@ -52,12 +54,14 @@ def listar_usuarios(db: Session = Depends(get_db)):
     usuarios_con_rol = []
     for user in usuarios:
         rol = get_user_role(user, db)
+        if rol not in ["superadmin", "adminmicroempresa", "vendedor", "usuario"]:
+            rol = "usuario"
         usuarios_con_rol.append({
             "id_usuario": user.id_usuario,
             "nombre": user.nombre,
             "email": user.email,
             "estado": user.estado,
-            "rol": rol or "usuario"
+            "rol": rol
         })
     return usuarios_con_rol
 
@@ -68,12 +72,14 @@ def obtener_usuario(id_usuario: int, db: Session = Depends(get_db)):
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     rol = get_user_role(usuario, db)
+    if rol not in ["superadmin", "adminmicroempresa", "vendedor", "usuario"]:
+        rol = "usuario"
     return {
         "id_usuario": usuario.id_usuario,
         "nombre": usuario.nombre,
         "email": usuario.email,
         "estado": usuario.estado,
-        "rol": rol or "usuario"
+        "rol": rol
     }
 
 
@@ -83,12 +89,14 @@ def actualizar_usuario(id_usuario: int, usuario: schemas.UsuarioUpdate, db: Sess
     if not actualizado:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     rol = get_user_role(actualizado, db)
+    if rol not in ["superadmin", "adminmicroempresa", "vendedor", "usuario"]:
+        rol = "usuario"
     return {
         "id_usuario": actualizado.id_usuario,
         "nombre": actualizado.nombre,
         "email": actualizado.email,
         "estado": actualizado.estado,
-        "rol": rol or "usuario"
+        "rol": rol
     }
 
 @router.delete("/{id_usuario}")

@@ -16,11 +16,18 @@ router = APIRouter(
 def crear_cliente(cliente: schemas.ClienteCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     rol = get_user_role(user, db)
     id_microempresa = cliente.id_microempresa
-    
+    # Asignar id_microempresa según el rol canónico
     if rol == "adminmicroempresa" and hasattr(user, "admin_microempresa") and user.admin_microempresa:
         id_microempresa = user.admin_microempresa.id_microempresa
     elif rol == "vendedor" and hasattr(user, "vendedor") and user.vendedor:
         id_microempresa = user.vendedor.id_microempresa
+    elif rol == "superadmin":
+        # superadmin puede crear clientes para cualquier microempresa
+        pass
+    elif rol == "usuario":
+        raise HTTPException(status_code=403, detail="No autorizado para crear clientes")
+    else:
+        raise HTTPException(status_code=403, detail="Rol no autorizado para crear clientes")
     cliente_data = schemas.ClienteCreate(
         nombre=cliente.nombre,
         documento=cliente.documento,
@@ -92,4 +99,23 @@ def habilitar_cliente(id_cliente: int, db: Session = Depends(get_db)):
     cliente.estado = True
     db.commit()
     db.refresh(cliente)
+    return cliente
+
+# Endpoint SEGURO: Solo verifica si existe un cliente con ese documento
+# NO expone datos sensibles (nombre, teléfono, email)
+# Retorna: { existe: bool, id_cliente: int | null }
+@router.get("/microempresa/{id_microempresa}/verificar-documento/{documento}")
+def verificar_cliente_por_documento(id_microempresa: int, documento: str, db: Session = Depends(get_db)):
+    cliente = service.buscar_cliente_por_documento(db, id_microempresa, documento)
+    if cliente:
+        return {"existe": True, "id_cliente": cliente.id_cliente}
+    return {"existe": False, "id_cliente": None}
+
+# Endpoint para obtener datos del cliente por ID (usado internamente después de verificar)
+# Este endpoint requiere el ID específico, no expone búsqueda abierta
+@router.get("/obtener/{id_cliente}", response_model=schemas.ClienteResponse)
+def obtener_cliente_por_id(id_cliente: int, db: Session = Depends(get_db)):
+    cliente = service.obtener_cliente(db, id_cliente)
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
     return cliente

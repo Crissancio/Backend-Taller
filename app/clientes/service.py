@@ -67,3 +67,19 @@ def eliminar_cliente(db: Session, id_cliente: int):
     db.delete(cliente)
     db.commit()
     return True
+
+# Buscar cliente por documento exacto (para autocompletar cuando coincide)
+def buscar_cliente_por_documento(db: Session, id_microempresa: int, documento: str):
+    return db.query(models.Cliente).filter(
+        models.Cliente.id_microempresa == id_microempresa,
+        models.Cliente.documento == documento,
+        models.Cliente.estado == True
+    ).first()
+
+# Buscar clientes por documento parcial (para sugerencias de autocompletado)
+def buscar_clientes_por_documento_parcial(db: Session, id_microempresa: int, documento: str):
+    return db.query(models.Cliente).filter(
+        models.Cliente.id_microempresa == id_microempresa,
+        models.Cliente.documento.ilike(f"{documento}%"),
+        models.Cliente.estado == True
+    ).limit(5).all()

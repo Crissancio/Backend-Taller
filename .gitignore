@@ -1,7 +1,27 @@
-# Ignorar carpetas de caché
+# --- Python Compilado (Basura automática) ---
 __pycache__/
-
-# Ignorar archivos compilados individuales (por si acaso)
 *.pyc
 *.pyo
 *.pyd
+
+# --- Entornos Virtuales
+venv/
+env/
+.venv/
+
+# --- Variables de Entorno
+.env
+.env.local
+
+# --- Archivos Multimedia
+public/productos/*
+
+#mantener la carpeta public para las imagenes
+!public/productos/.gitkeep
+
+# --- IDEs / Editores (Configuración personal) ---
+.vscode/
+.idea/
+
+# --- Logs del sistema ---
+*.log
