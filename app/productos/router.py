@@ -195,7 +195,7 @@ def crear_producto(
         "id_microempresa": id_microempresa
     }
     
-    nuevo_producto = service.crear_producto(db, schemas.ProductoCreate(**producto_data))
+    nuevo_producto = service.crear_producto(db, id_microempresa, schemas.ProductoCreate(**producto_data))
 
     '''
     try:

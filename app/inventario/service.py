@@ -6,6 +6,17 @@ from app.productos.models import Producto
 
 def crear_stock(db: Session, stock: schemas.StockCreate):
     from datetime import datetime
+    # Verificar si ya existe stock para este producto (upsert)
+    existing = db.query(models.Stock).filter(models.Stock.id_producto == stock.id_producto).first()
+    if existing:
+        # Actualizar stock existente
+        existing.cantidad = stock.cantidad
+        existing.stock_minimo = stock.stock_minimo if stock.stock_minimo else existing.stock_minimo
+        existing.ultima_actualizacion = datetime.now()
+        db.commit()
+        db.refresh(existing)
+        return existing
+    # Crear nuevo stock
     data = stock.dict()
     data["ultima_actualizacion"] = datetime.now()
     db_stock = models.Stock(**data)
