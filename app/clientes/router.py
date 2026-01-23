@@ -100,3 +100,22 @@ def habilitar_cliente(id_cliente: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(cliente)
     return cliente
+
+# Endpoint SEGURO: Solo verifica si existe un cliente con ese documento
+# NO expone datos sensibles (nombre, teléfono, email)
+# Retorna: { existe: bool, id_cliente: int | null }
+@router.get("/microempresa/{id_microempresa}/verificar-documento/{documento}")
+def verificar_cliente_por_documento(id_microempresa: int, documento: str, db: Session = Depends(get_db)):
+    cliente = service.buscar_cliente_por_documento(db, id_microempresa, documento)
+    if cliente:
+        return {"existe": True, "id_cliente": cliente.id_cliente}
+    return {"existe": False, "id_cliente": None}
+
+# Endpoint para obtener datos del cliente por ID (usado internamente después de verificar)
+# Este endpoint requiere el ID específico, no expone búsqueda abierta
+@router.get("/obtener/{id_cliente}", response_model=schemas.ClienteResponse)
+def obtener_cliente_por_id(id_cliente: int, db: Session = Depends(get_db)):
+    cliente = service.obtener_cliente(db, id_cliente)
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+    return cliente

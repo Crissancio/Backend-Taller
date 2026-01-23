@@ -9,6 +9,7 @@ from app.notificaciones.service import crear_notificacion
 from app.notificaciones.schemas import NotificacionCreate
 from app.productos.models import Producto
 from app.clientes.models import Cliente
+from sqlalchemy import text
 
 # --- CRUD BÁSICO ---
 
@@ -240,7 +241,7 @@ def validar_pago_venta(db: Session, id_venta: int):
         pago.estado = "VALIDADO"
 
     # Notificar a todos los admins de la microempresa sobre la validación del pago
-    from sqlalchemy import text
+
     admins = db.execute(text("SELECT id_usuario FROM admin_microempresa WHERE id_microempresa = :idm"), {"idm": venta.id_microempresa}).fetchall()
     for admin in admins:
         notif = NotificacionCreate(
