@@ -27,6 +27,8 @@ from app.ventas.router import router as ventas_router
 from app.proveedores.router import router as proveedores_router
 from app.compras.router import router as compras_router
 
+from app.reportes.router import router as reportes_router
+
 app = FastAPI(title="Sistoys Backend")
 
 # --- CONFIGURACIÓN DE CORS (CORREGIDA) ---
@@ -69,6 +71,9 @@ app.include_router(suscripciones_router)
 app.include_router(notificaciones_router)
 app.include_router(proveedores_router)
 app.include_router(compras_router)
+
+
+app.include_router(reportes_router)
 
 # Habilitar WebSocket para notificaciones
 app.include_router(notificaciones_ws_router)

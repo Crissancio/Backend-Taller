@@ -7,6 +7,15 @@ from app.compras import service, schemas
 
 router = APIRouter(prefix="/compras", tags=["Compras"])
 
+from fastapi import Query # Asegúrate de importar Query
+
+# 1️⃣9️⃣ Listar compras de una microempresa (ESTE FALTABA)
+@router.get("", response_model=List[schemas.CompraResponse])
+def listar_compras(id_microempresa: int = Query(None), db: Session = Depends(get_db)):
+    if id_microempresa is None:
+        raise HTTPException(status_code=400, detail="Debe especificar la microempresa")
+    return service.listar_compras(db, id_microempresa)
+
 # 1️⃣2️⃣ Crear compra
 @router.post("", response_model=schemas.CompraResponse)
 def crear_compra(data: schemas.CompraCreate, db: Session = Depends(get_db)):
