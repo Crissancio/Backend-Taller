@@ -6,9 +6,12 @@ from app.proveedores.models import Proveedor, ProveedorProducto, ProveedorMetodo
 from app.productos.models import Producto
 # Importamos el servicio de inventario (asegúrate de que la ruta sea correcta)
 from app.inventario import service as inventario_service
+from app.notificaciones import service as notificaciones_service
+from app.users.models import AdminMicroempresa
+from app.notificaciones.schemas import NotificacionCreate
 
 # 1️⃣ Crear compra (Con actualización automática de Stock)
-def crear_compra(db: Session, data: schemas.CompraCreate, id_microempresa: int = None):
+def crear_compra(db: Session, data: schemas.CompraCreate, id_microempresa: int = None, usuario_actual=None):
     # 1. Validar Proveedor
     proveedor = db.query(Proveedor).filter_by(id_proveedor=data.id_proveedor, estado=True).first()
     if not proveedor:
@@ -83,6 +86,20 @@ def crear_compra(db: Session, data: schemas.CompraCreate, id_microempresa: int =
     compra.total = total_acumulado
     db.commit()
     db.refresh(compra)
+
+    # 6. Notificar a todos los admins de la microempresa
+    if compra.id_microempresa:
+        admins = db.query(AdminMicroempresa).filter_by(id_microempresa=compra.id_microempresa).all()
+        for admin in admins:
+            notificacion = NotificacionCreate(
+                id_microempresa=compra.id_microempresa,
+                id_usuario=admin.id_usuario,
+                tipo="compra",
+                mensaje=f"Se ha realizado una nueva compra (ID: {compra.id_compra}) en la microempresa.",
+                leido=False
+            )
+            notificaciones_service.crear_notificacion(db, notificacion)
+
     return compra
 
 # 2️⃣ Agregar detalle a compra (También actualiza stock)

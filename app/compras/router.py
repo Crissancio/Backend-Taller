@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.core.dependencies import get_db
 from app.compras import service, schemas
+from app.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/compras", tags=["Compras"])
 
@@ -18,9 +19,9 @@ def listar_compras(id_microempresa: int = Query(None), db: Session = Depends(get
 
 # 1️⃣2️⃣ Crear compra
 @router.post("", response_model=schemas.CompraResponse)
-def crear_compra(data: schemas.CompraCreate, db: Session = Depends(get_db)):
+def crear_compra(data: schemas.CompraCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
 	# TODO: Reemplazar None por user.id_microempresa cuando haya autenticación
-	return service.crear_compra(db, data, id_microempresa=None)
+	return service.crear_compra(db, data, id_microempresa=None, usuario_actual=user)
 
 # 1️⃣3️⃣ Agregar detalle a compra
 @router.post("/{id_compra}/detalles", response_model=schemas.DetalleCompraResponse)
@@ -56,3 +57,9 @@ def listar_pagos(id_compra: int, db: Session = Depends(get_db)):
 @router.post("/{id_compra}/finalizar", response_model=schemas.CompraResponse)
 def finalizar_compra(id_compra: int = Path(...), db: Session = Depends(get_db)):
 	return service.finalizar_compra(db, id_compra, id_microempresa=None)
+
+# Obtener solo los detalles de una compra por su id
+@router.get("/{id_compra}/detalles", response_model=List[schemas.DetalleCompraResponse])
+def obtener_detalles_compra(id_compra: int, db: Session = Depends(get_db)):
+	detalles = db.query(service.models.DetalleCompra).filter_by(id_compra=id_compra).all()
+	return detalles

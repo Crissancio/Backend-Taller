@@ -84,13 +84,18 @@ def crear_metodo_pago(db: Session, id_proveedor: int, data: schemas.ProveedorMet
 	return metodo
 
 # 7️⃣ Listar métodos de pago activos
-def listar_metodos_pago(db: Session, id_proveedor: int, id_microempresa: int = None):
+def listar_metodos_pago(db: Session, id_proveedor: int, id_microempresa: int = None, solo_activos: bool = True):
 	proveedor = db.query(models.Proveedor).filter_by(id_proveedor=id_proveedor).first()
 	if not proveedor:
 		raise HTTPException(status_code=404, detail="Proveedor no encontrado")
 	if id_microempresa is not None and proveedor.id_microempresa != id_microempresa:
 		raise HTTPException(status_code=403, detail="No puede listar métodos de pago de otra microempresa")
-	return db.query(models.ProveedorMetodoPago).filter_by(id_proveedor=id_proveedor, activo=True).all()
+	query = db.query(models.ProveedorMetodoPago).filter_by(id_proveedor=id_proveedor)
+	if solo_activos:
+		query = query.filter_by(activo=True)
+	else:
+		query = query.filter_by(activo=False)
+	return query.all()
 
 # 8️⃣ Activar/desactivar método de pago
 def cambiar_estado_metodo_pago(db: Session, id_metodo_pago: int, activo: bool, id_microempresa: int = None):
@@ -134,13 +139,18 @@ def asociar_producto_proveedor(db: Session, id_proveedor: int, data: schemas.Pro
 	return rel
 
 # 🔟 Listar productos de proveedor
-def listar_productos_proveedor(db: Session, id_proveedor: int, id_microempresa: int = None):
+def listar_productos_proveedor(db: Session, id_proveedor: int, id_microempresa: int = None, solo_activos: bool = True):
 	proveedor = db.query(models.Proveedor).filter_by(id_proveedor=id_proveedor).first()
 	if not proveedor:
 		raise HTTPException(status_code=404, detail="Proveedor no encontrado")
 	if id_microempresa is not None and proveedor.id_microempresa != id_microempresa:
 		raise HTTPException(status_code=403, detail="No puede listar productos de proveedores de otra microempresa")
-	return db.query(models.ProveedorProducto).filter_by(id_proveedor=id_proveedor, activo=True).all()
+	query = db.query(models.ProveedorProducto).filter_by(id_proveedor=id_proveedor)
+	if solo_activos:
+		query = query.filter_by(activo=True)
+	else:
+		query = query.filter_by(activo=False)
+	return query.all()
 
 # 1️⃣1️⃣ Activar/desactivar producto del proveedor
 def cambiar_estado_producto_proveedor(db: Session, id_proveedor: int, id_producto: int, activo: bool, id_microempresa: int = None):

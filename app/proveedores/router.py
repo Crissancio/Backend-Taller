@@ -50,11 +50,18 @@ def crear_metodo_pago(id_proveedor: int = Path(...), data: schemas.ProveedorMeto
 	# TODO: Reemplazar None por user.id_microempresa cuando haya autenticación
 	return service.crear_metodo_pago(db, id_proveedor, data, id_microempresa)
 
+
 # 7️⃣ Listar métodos de pago activos
 @router.get("/{id_proveedor}/metodos-pago", response_model=List[schemas.ProveedorMetodoPagoResponse])
 def listar_metodos_pago(id_proveedor: int = Path(...), id_microempresa: int = Query(None), db: Session = Depends(get_db)):
 	# TODO: Reemplazar None por user.id_microempresa cuando haya autenticación
 	return service.listar_metodos_pago(db, id_proveedor, id_microempresa)
+
+# Listar métodos de pago NO activos
+@router.get("/{id_proveedor}/metodos-pago/no-activos", response_model=List[schemas.ProveedorMetodoPagoResponse])
+def listar_metodos_pago_no_activos(id_proveedor: int = Path(...), id_microempresa: int = Query(None), db: Session = Depends(get_db)):
+	# TODO: Reemplazar None por user.id_microempresa cuando haya autenticación
+	return service.listar_metodos_pago(db, id_proveedor, id_microempresa, solo_activos=False)
 
 # 8️⃣ Activar/desactivar método de pago
 @router.patch("/metodos-pago/{id_metodo_pago}/estado", response_model=schemas.ProveedorMetodoPagoResponse)
@@ -68,11 +75,18 @@ def asociar_producto_proveedor(id_proveedor: int = Path(...), data: schemas.Prov
 	# TODO: Reemplazar None por user.id_microempresa cuando haya autenticación
 	return service.asociar_producto_proveedor(db, id_proveedor, data, id_microempresa)
 
-# 🔟 Listar productos de proveedor
+
+# 🔟 Listar productos de proveedor (activos)
 @router.get("/{id_proveedor}/productos", response_model=List[schemas.ProveedorProductoResponse])
 def listar_productos_proveedor(id_proveedor: int = Path(...), id_microempresa: int = Query(None), db: Session = Depends(get_db)):
 	# TODO: Reemplazar None por user.id_microempresa cuando haya autenticación
 	return service.listar_productos_proveedor(db, id_proveedor, id_microempresa)
+
+# Listar productos NO activos de proveedor
+@router.get("/{id_proveedor}/productos/no-activos", response_model=List[schemas.ProveedorProductoResponse])
+def listar_productos_no_activos_proveedor(id_proveedor: int = Path(...), id_microempresa: int = Query(None), db: Session = Depends(get_db)):
+	# TODO: Reemplazar None por user.id_microempresa cuando haya autenticación
+	return service.listar_productos_proveedor(db, id_proveedor, id_microempresa, solo_activos=False)
 
 # 1️⃣1️⃣ Activar/desactivar producto del proveedor
 @router.patch("/{id_proveedor}/productos/{id_producto}/estado", response_model=schemas.ProveedorProductoResponse)

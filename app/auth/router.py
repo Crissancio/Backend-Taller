@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.auth import schemas, service
+
 from app.core.security import verify_password, hash_password
 from app.core.email_utils import send_recovery_email
 from jose import JWTError, jwt
 from app.core.config import SECRET_KEY, ALGORITHM
+from app.core.dependencies import get_user_role
 
 from app.users.schemas import UsuarioResponse
 from app.auth.schemas import RegistroUsuario
