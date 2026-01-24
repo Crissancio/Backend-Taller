@@ -9,6 +9,7 @@ venv/
 env/
 .venv/
 
+
 # --- Variables de Entorno
 .env
 .env.local
