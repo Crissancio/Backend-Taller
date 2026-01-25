@@ -26,6 +26,15 @@ def crear_suscripcion(db: Session, data: schemas.SuscripcionCreate):
     db.add(suscripcion)
     db.commit()
     db.refresh(suscripcion)
+    # Evento: Nueva suscripción creada
+    from app.notificaciones import service as notif_service
+    notif_service.generar_evento(
+        tipo_evento="PAGO_APROBADO",
+        mensaje=f"Nueva suscripción creada para la microempresa {data.id_microempresa} (plan {data.id_plan}).",
+        id_microempresa=data.id_microempresa,
+        referencia_id=suscripcion.id_suscripcion,
+        db=db
+    )
     return suscripcion
 
 def listar_suscripciones(db: Session):

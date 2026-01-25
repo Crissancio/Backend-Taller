@@ -48,6 +48,15 @@ def crear_venta(db: Session, venta: schemas.VentaCreate):
             db.add(db_pag)
     db.commit()
     db.refresh(db_venta)
+    # Notificación y evento: Venta registrada
+    from app.notificaciones import service as notif_service
+    notif_service.generar_evento(
+        tipo_evento="VENTA_REGISTRADA",
+        mensaje=f"Se ha registrado una nueva venta (ID: {db_venta.id_venta}) por un total de {db_venta.total}.",
+        id_microempresa=db_venta.id_microempresa,
+        referencia_id=db_venta.id_venta,
+        db=db
+    )
     return db_venta
 
 def listar_ventas(db: Session):
@@ -114,8 +123,8 @@ def crear_venta_presencial(db: Session, id_microempresa: int, venta: schemas.Ven
     db.add(db_venta)
     db.commit()
     db.refresh(db_venta)
-    
     # Crear detalles y descontar stock
+    from app.notificaciones import service as notif_service
     for det in venta.detalles:
         db_det = models.DetalleVenta(
             id_venta=db_venta.id_venta,
@@ -125,32 +134,41 @@ def crear_venta_presencial(db: Session, id_microempresa: int, venta: schemas.Ven
             subtotal=det.cantidad * det.precio_unitario
         )
         db.add(db_det)
-        
         # Descontar stock
         stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
         if not stock:
             raise HTTPException(status_code=400, detail=f"No existe stock para el producto {det.id_producto}")
-        
         stock.cantidad -= det.cantidad
         stock.ultima_actualizacion = datetime.now()
         db.commit()
-        
-        # Notificación si stock bajo
-        if stock.cantidad <= stock.stock_minimo:
-            producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
-            if producto:
-                admins = db.execute("SELECT id_usuario FROM admin_microempresa WHERE id_microempresa = :idm", {"idm": id_microempresa}).fetchall()
-                for admin in admins:
-                    notif = NotificacionCreate(
-                        id_microempresa=id_microempresa,
-                        id_usuario=admin[0],
-                        tipo="STOCK_BAJO",
-                        mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo."
-                    )
-                    crear_notificacion(db, notif)
-                
+        # Evento de stock bajo o agotado
+        producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
+        if stock.cantidad == 0:
+            notif_service.generar_evento(
+                tipo_evento="STOCK_AGOTADO",
+                mensaje=f"El producto '{producto.nombre}' se ha agotado (stock=0)",
+                id_microempresa=id_microempresa,
+                referencia_id=producto.id_producto,
+                db=db
+            )
+        elif stock.cantidad <= stock.stock_minimo:
+            notif_service.generar_evento(
+                tipo_evento="STOCK_BAJO",
+                mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo.",
+                id_microempresa=id_microempresa,
+                referencia_id=producto.id_producto,
+                db=db
+            )
     db.commit()
     db.refresh(db_venta)
+    # Evento de venta pagada
+    notif_service.generar_evento(
+        tipo_evento="VENTA_REALIZADA",
+        mensaje=f"Venta presencial pagada (ID: {db_venta.id_venta}) por un total de {db_venta.total}.",
+        id_microempresa=id_microempresa,
+        referencia_id=db_venta.id_venta,
+        db=db
+    )
     return db_venta
 
 def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data: dict):
@@ -240,43 +258,39 @@ def validar_pago_venta(db: Session, id_venta: int):
     if pago:
         pago.estado = "VALIDADO"
 
-    # Notificar a todos los admins de la microempresa sobre la validación del pago
-
-    admins = db.execute(text("SELECT id_usuario FROM admin_microempresa WHERE id_microempresa = :idm"), {"idm": venta.id_microempresa}).fetchall()
-    for admin in admins:
-        notif = NotificacionCreate(
-            id_microempresa=venta.id_microempresa,
-            id_usuario=admin[0],
-            tipo="PAGO_VALIDADO",
-            mensaje=f"Se ha validado un pago para la venta #{venta.id_venta}."
-        )
-        crear_notificacion(db, notif)
-    
+    # Evento de venta pagada
+    from app.notificaciones import service as notif_service
+    notif_service.generar_evento(
+        tipo_evento="PAGO_VENTA_CONFIRMADO",
+        mensaje=f"Se ha validado un pago para la venta #{venta.id_venta}.",
+        id_microempresa=venta.id_microempresa,
+        referencia_id=venta.id_venta,
+        db=db
+    )
     # Descontar stock
     detalles = db.query(models.DetalleVenta).filter(models.DetalleVenta.id_venta == id_venta).all()
-    
     for det in detalles:
         stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
         if stock:
             stock.cantidad -= det.cantidad
             stock.ultima_actualizacion = datetime.now()
-            
-            # Alerta stock bajo
-            if stock.cantidad <= stock.stock_minimo:
-                producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
-                if producto:
-                    admins = db.execute("SELECT id_usuario FROM admin_microempresa WHERE id_microempresa = :idm", {"idm": venta.id_microempresa}).fetchall()
-                    for admin in admins:
-                        notif = NotificacionCreate(
-                            id_microempresa=venta.id_microempresa,
-                            id_usuario=admin[0],
-                            tipo="STOCK_BAJO",
-                            mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo."
-                        )
-                        crear_notificacion(db, notif)
-        else:
-             pass
-
+            producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
+            if stock.cantidad == 0:
+                notif_service.generar_evento(
+                    tipo_evento="STOCK_AGOTADO",
+                    mensaje=f"El producto '{producto.nombre}' se ha agotado (stock=0)",
+                    id_microempresa=venta.id_microempresa,
+                    referencia_id=producto.id_producto,
+                    db=db
+                )
+            elif stock.cantidad <= stock.stock_minimo:
+                notif_service.generar_evento(
+                    tipo_evento="STOCK_BAJO",
+                    mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo.",
+                    id_microempresa=venta.id_microempresa,
+                    referencia_id=producto.id_producto,
+                    db=db
+                )
     db.commit()
     db.refresh(venta)
     return venta
@@ -291,6 +305,15 @@ def rechazar_pago_venta(db: Session, id_venta: int):
     if pago:
         pago.estado = "RECHAZADO"
         db.commit()
+    # Evento de venta cancelada
+    from app.notificaciones import service as notif_service
+    notif_service.generar_evento(
+        tipo_evento="VENTA_CANCELADA",
+        mensaje=f"La venta #{venta.id_venta} ha sido cancelada.",
+        id_microempresa=venta.id_microempresa,
+        referencia_id=venta.id_venta,
+        db=db
+    )
     return venta
 
 def listar_ventas_filtrado(db: Session, id_microempresa: int, fecha_inicio=None, fecha_fin=None, estado=None, tipo=None):

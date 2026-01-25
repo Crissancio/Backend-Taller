@@ -40,17 +40,24 @@ def actualizar_stock(db: Session, id_stock: int, stock: schemas.StockUpdate):
         db_stock.cantidad = 0
     db.commit()
     db.refresh(db_stock)
-    # Notificación si el stock está igual o por debajo del mínimo
-    if db_stock.cantidad <= db_stock.stock_minimo:
-        from app.notificaciones.service import crear_notificacion
-        admins = db.execute("SELECT id_usuario FROM admin_microempresa WHERE id_microempresa = :idm", {"idm": producto.id_microempresa}).fetchall()
-        for admin in admins:
-            crear_notificacion(db, schemas.NotificacionCreate(
-                id_microempresa=producto.id_microempresa,
-                id_usuario=admin[0],
-                tipo="stock_minimo",
-                mensaje=f"El producto '{producto.nombre}' tiene stock igual o menor al mínimo definido ({db_stock.cantidad}/{db_stock.stock_minimo})"
-            ))
+    # Notificación y evento si el stock está igual o por debajo del mínimo
+    from app.notificaciones import service as notif_service
+    if db_stock.cantidad == 0:
+        notif_service.generar_evento(
+            tipo_evento="STOCK_AGOTADO",
+            mensaje=f"El producto '{producto.nombre}' se ha agotado (stock=0)",
+            id_microempresa=producto.id_microempresa,
+            referencia_id=producto.id_producto,
+            db=db
+        )
+    elif db_stock.cantidad <= db_stock.stock_minimo:
+        notif_service.generar_evento(
+            tipo_evento="STOCK_BAJO",
+            mensaje=f"El producto '{producto.nombre}' tiene stock igual o menor al mínimo definido ({db_stock.cantidad}/{db_stock.stock_minimo})",
+            id_microempresa=producto.id_microempresa,
+            referencia_id=producto.id_producto,
+            db=db
+        )
     return db_stock
 
 def baja_logica_stock(db: Session, id_stock: int):
@@ -129,16 +136,32 @@ def ajuste_stock(db: Session, id_producto: int, ajuste: int):
     stock.ultima_actualizacion = datetime.now()
     db.commit()
     db.refresh(stock)
-    if stock.cantidad <= stock.stock_minimo:
-        from app.notificaciones.service import crear_notificacion
-        admins = db.execute("SELECT id_usuario FROM admin_microempresa WHERE id_microempresa = :idm", {"idm": producto.id_microempresa}).fetchall()
-        for admin in admins:
-            crear_notificacion(db, schemas.NotificacionCreate(
-                id_microempresa=producto.id_microempresa,
-                id_usuario=admin[0],
-                tipo="stock_minimo",
-                mensaje=f"El producto '{producto.nombre}' tiene stock igual o menor al mínimo definido ({stock.cantidad}/{stock.stock_minimo})"
-            ))
+    # Evento por ajuste manual
+    from app.notificaciones import service as notif_service
+    notif_service.generar_evento(
+        tipo_evento="AJUSTE_INVENTARIO",
+        mensaje=f"Ajuste manual de inventario para '{producto.nombre}': {ajuste} unidades. Stock actual: {stock.cantidad}",
+        id_microempresa=producto.id_microempresa,
+        referencia_id=producto.id_producto,
+        db=db
+    )
+    # Evento por stock bajo o agotado
+    if stock.cantidad == 0:
+        notif_service.generar_evento(
+            tipo_evento="STOCK_AGOTADO",
+            mensaje=f"El producto '{producto.nombre}' se ha agotado (stock=0)",
+            id_microempresa=producto.id_microempresa,
+            referencia_id=producto.id_producto,
+            db=db
+        )
+    elif stock.cantidad <= stock.stock_minimo:
+        notif_service.generar_evento(
+            tipo_evento="STOCK_BAJO",
+            mensaje=f"El producto '{producto.nombre}' tiene stock igual o menor al mínimo definido ({stock.cantidad}/{stock.stock_minimo})",
+            id_microempresa=producto.id_microempresa,
+            referencia_id=producto.id_producto,
+            db=db
+        )
     return stock
 
 def listar_stock_por_microempresa_con_alerta(db: Session, id_microempresa: int):

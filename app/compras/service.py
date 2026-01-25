@@ -87,19 +87,15 @@ def crear_compra(db: Session, data: schemas.CompraCreate, id_microempresa: int =
     db.commit()
     db.refresh(compra)
 
-    # 6. Notificar a todos los admins de la microempresa
-    if compra.id_microempresa:
-        admins = db.query(AdminMicroempresa).filter_by(id_microempresa=compra.id_microempresa).all()
-        for admin in admins:
-            notificacion = NotificacionCreate(
-                id_microempresa=compra.id_microempresa,
-                id_usuario=admin.id_usuario,
-                tipo="compra",
-                mensaje=f"Se ha realizado una nueva compra (ID: {compra.id_compra}) en la microempresa.",
-                leido=False
-            )
-            notificaciones_service.crear_notificacion(db, notificacion)
-
+    # 6. Evento y notificación automática de compra registrada
+    from app.notificaciones import service as notif_service
+    notif_service.generar_evento(
+        tipo_evento="COMPRA_REGISTRADA",
+        mensaje=f"Se ha realizado una nueva compra (ID: {compra.id_compra}) en la microempresa.",
+        id_microempresa=compra.id_microempresa,
+        referencia_id=compra.id_compra,
+        db=db
+    )
     return compra
 
 # 2️⃣ Agregar detalle a compra (También actualiza stock)

@@ -210,7 +210,7 @@ CREATE TABLE stock (
     CONSTRAINT uq_stock_producto
         UNIQUE (id_producto)
 );
-
+/*
 CREATE TABLE notificacion (
     id_notificacion SERIAL PRIMARY KEY,
     id_microempresa INTEGER NOT NULL,
@@ -230,7 +230,7 @@ CREATE TABLE notificacion (
         FOREIGN KEY (id_usuario)
         REFERENCES usuario(id_usuario)
 );
-
+*/
 CREATE TABLE venta (
     id_venta SERIAL PRIMARY KEY,
     id_microempresa INT NOT NULL,
@@ -385,3 +385,86 @@ CREATE TABLE pago_compra (
         REFERENCES proveedor_metodo_pago(id_metodo_pago)
 );
 
+
+
+/*------TABLA MODIFIADA--------*/
+CREATE TABLE notificacion (
+    id_notificacion SERIAL PRIMARY KEY,
+    id_microempresa INTEGER NOT NULL,
+    id_usuario INTEGER NOT NULL,
+
+    tipo VARCHAR(50) NOT NULL,  
+    -- STOCK_BAJO, VENTA_REALIZADA, COMPRA_CONFIRMADA, PAGO_RECIBIDO, etc
+
+    mensaje TEXT NOT NULL,
+
+    canal VARCHAR(20) NOT NULL DEFAULT 'APP',
+    -- APP, EMAIL, WHATSAPP
+
+    leido BOOLEAN NOT NULL DEFAULT FALSE,
+    enviado BOOLEAN NOT NULL DEFAULT FALSE,
+
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (id_microempresa) REFERENCES microempresas(id_microempresa),
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
+);
+
+/*
+
+MODIFICAR LA TABLA DE NOTIFIACIONES YA EXISTENTES
+-- Iniciamos una transacción para asegurar que todo se aplique o nada
+BEGIN;
+
+-- 1. (Opcional pero recomendado) Limpiar datos nulos existentes en 'tipo'
+-- Si tienes filas donde 'tipo' es NULL, el paso siguiente fallaría. 
+-- Aquí asignamos un valor por defecto temporal a esas filas.
+UPDATE notificacion 
+SET tipo = 'GENERAL' 
+WHERE tipo IS NULL;
+
+-- 2. Modificar la columna 'tipo' para que no acepte nulos
+ALTER TABLE notificacion 
+ALTER COLUMN tipo SET NOT NULL;
+
+-- 3. Agregar la columna 'canal' con valor por defecto 'APP' y NO NULO
+-- PostgreSQL rellenará automáticamente las filas existentes con 'APP'
+ALTER TABLE notificacion 
+ADD COLUMN canal VARCHAR(20) NOT NULL DEFAULT 'APP';
+
+-- 4. Agregar la columna 'enviado' con valor por defecto FALSE y NO NULO
+ALTER TABLE notificacion 
+ADD COLUMN enviado BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Confirmamos los cambios
+COMMIT;
+
+*/
+
+
+--NUEVA TABLA
+CREATE TABLE notificacion_preferencia (
+    id_preferencia SERIAL PRIMARY KEY,
+    id_usuario INTEGER NOT NULL,
+
+    tipo_evento VARCHAR(50) NOT NULL,
+
+    recibir_app BOOLEAN DEFAULT TRUE,
+    recibir_email BOOLEAN DEFAULT FALSE,
+    recibir_whatsapp BOOLEAN DEFAULT FALSE,
+
+    activo BOOLEAN DEFAULT TRUE,
+
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario),
+
+    UNIQUE (id_usuario, tipo_evento)
+);
+CREATE TABLE notificacion_email_log (
+    id_log SERIAL PRIMARY KEY,
+    id_notificacion INTEGER NOT NULL,
+    email_destino VARCHAR(150),
+    estado VARCHAR(20),
+    fecha_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (id_notificacion) REFERENCES notificacion(id_notificacion)
+);

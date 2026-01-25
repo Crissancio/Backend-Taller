@@ -1,3 +1,32 @@
+import ssl
+
+def enviar_email(destino: str, asunto: str, mensaje: str) -> bool:
+    """
+    Envía un correo usando Gmail SMTP con SSL.
+    Requiere variables de entorno: GMAIL_USER, GMAIL_PASSWORD
+    """
+    import os
+    import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    user = os.getenv("GMAIL_USER")
+    password = os.getenv("GMAIL_PASSWORD")
+    if not user or not password:
+        raise Exception("Faltan credenciales de Gmail en variables de entorno")
+    msg = MIMEMultipart()
+    msg["From"] = user
+    msg["To"] = destino
+    msg["Subject"] = asunto
+    msg.attach(MIMEText(mensaje, "html"))
+    context = ssl.create_default_context()
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+            server.login(user, password)
+            server.sendmail(user, destino, msg.as_string())
+        return True
+    except Exception as e:
+        print(f"[EMAIL] Error enviando correo: {e}")
+        return False
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart

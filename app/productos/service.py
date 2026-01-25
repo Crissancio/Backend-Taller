@@ -79,6 +79,15 @@ def crear_producto(db: Session, id_microempresa: int, producto: schemas.Producto
     from app.inventario.models import Stock
     from app.inventario.service import crear_stock_inicial
     crear_stock_inicial(db, db_producto.id_producto)
+    # Evento: Producto creado
+    from app.notificaciones import service as notif_service
+    notif_service.generar_evento(
+        tipo_evento="NUEVO_PRODUCTO",
+        mensaje=f"Se ha creado el producto '{db_producto.nombre}' en la microempresa.",
+        id_microempresa=id_microempresa,
+        referencia_id=db_producto.id_producto,
+        db=db
+    )
     return db_producto
 
 def actualizar_producto(db: Session, id_producto: int, producto: schemas.ProductoUpdate):
@@ -105,6 +114,15 @@ def desactivar_producto(db: Session, id_producto: int):
         db_producto.estado = False
         db.commit()
         db.refresh(db_producto)
+        # Evento: Producto desactivado
+        from app.notificaciones import service as notif_service
+        notif_service.generar_evento(
+            tipo_evento="PRODUCTO_DESACTIVADO",
+            mensaje=f"El producto '{db_producto.nombre}' ha sido desactivado.",
+            id_microempresa=db_producto.id_microempresa,
+            referencia_id=db_producto.id_producto,
+            db=db
+        )
     return db_producto
 
 def eliminar_producto_fisico(db: Session, id_producto: int):

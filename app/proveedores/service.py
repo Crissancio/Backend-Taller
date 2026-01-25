@@ -20,6 +20,15 @@ def crear_proveedor(db: Session, data: schemas.ProveedorCreate):
 	db.add(proveedor)
 	db.commit()
 	db.refresh(proveedor)
+	# Evento: Proveedor creado
+	from app.notificaciones import service as notif_service
+	notif_service.generar_evento(
+		tipo_evento="PROVEEDOR_CREADO",
+		mensaje=f"Se ha creado el proveedor '{proveedor.nombre}' en la microempresa.",
+		id_microempresa=proveedor.id_microempresa,
+		referencia_id=proveedor.id_proveedor,
+		db=db
+	)
 	return proveedor
 
 # 2️⃣ Listar proveedores por microempresa
@@ -81,6 +90,15 @@ def crear_metodo_pago(db: Session, id_proveedor: int, data: schemas.ProveedorMet
 	db.add(metodo)
 	db.commit()
 	db.refresh(metodo)
+	# Evento: Método de pago agregado
+	from app.notificaciones import service as notif_service
+	notif_service.generar_evento(
+		tipo_evento="METODO_PAGO_AGREGADO",
+		mensaje=f"Se ha agregado un nuevo método de pago al proveedor '{proveedor.nombre}'.",
+		id_microempresa=proveedor.id_microempresa,
+		referencia_id=proveedor.id_proveedor,
+		db=db
+	)
 	return metodo
 
 # 7️⃣ Listar métodos de pago activos
@@ -165,4 +183,14 @@ def cambiar_estado_producto_proveedor(db: Session, id_proveedor: int, id_product
 	rel.activo = activo
 	db.commit()
 	db.refresh(rel)
+	# Evento: Producto activado/desactivado para proveedor
+	from app.notificaciones import service as notif_service
+	estado_str = "activado" if activo else "desactivado"
+	notif_service.generar_evento(
+		tipo_evento="PRODUCTO_" + estado_str.upper(),
+		mensaje=f"El producto ID {id_producto} ha sido {estado_str} para el proveedor ID {id_proveedor}.",
+		id_microempresa=proveedor.id_microempresa,
+		referencia_id=id_producto,
+		db=db
+	)
 	return rel
