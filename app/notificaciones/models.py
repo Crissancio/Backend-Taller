@@ -12,7 +12,7 @@ class Notificacion(Base):
     id_notificacion = Column(Integer, primary_key=True, index=True)
     id_microempresa = Column(Integer, ForeignKey("microempresas.id_microempresa"), nullable=False)
     id_usuario = Column(Integer, ForeignKey("usuario.id_usuario"), nullable=False)
-    tipo_evento = Column(String(50), nullable=False)  # STOCK_BAJO, COMPRA_REGISTRADA, etc
+    tipo_evento = Column("tipo", String(50), nullable=False)  # Mapea a columna 'tipo'
     canal = Column(String(20), nullable=False)        # IN_APP, EMAIL, WHATSAPP
     mensaje = Column(Text, nullable=False)
     leido = Column(Boolean, default=False, nullable=False)
