@@ -1,3 +1,5 @@
+from fastapi.responses import StreamingResponse
+import io
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Body
 from sqlalchemy.orm import Session
@@ -29,6 +31,7 @@ def agregar_detalle_compra(id_compra: int = Path(...), data: schemas.DetalleComp
 	return service.agregar_detalle_compra(db, id_compra, data, id_microempresa=None)
 
 # 1️⃣4️⃣ Obtener compra completa
+# 1️⃣4️⃣ Obtener compra completa
 @router.get("/{id_compra}")
 def obtener_compra_completa(id_compra: int, db: Session = Depends(get_db)):
 	compra, detalles, pagos = service.obtener_compra_completa(db, id_compra)
@@ -37,6 +40,57 @@ def obtener_compra_completa(id_compra: int, db: Session = Depends(get_db)):
 		"detalles": [schemas.DetalleCompraResponse.model_validate(d) for d in detalles],
 		"pagos": [schemas.PagoCompraResponse.model_validate(p) for p in pagos]
 	}
+
+# PDF de factura de compra
+@router.get("/{id_compra}/pdf")
+def generar_pdf_compra(id_compra: int, db: Session = Depends(get_db)):
+	from reportlab.lib.pagesizes import letter
+	from reportlab.pdfgen import canvas
+	from reportlab.lib.units import mm
+	import datetime
+
+	compra, detalles, _ = service.obtener_compra_completa(db, id_compra)
+	proveedor = compra.proveedor
+	buffer = io.BytesIO()
+	c = canvas.Canvas(buffer, pagesize=letter)
+	width, height = letter
+
+	# Encabezado
+	c.setFont("Helvetica-Bold", 16)
+	c.drawString(30, height - 40, "Factura de Compra")
+	c.setFont("Helvetica", 10)
+	c.drawString(30, height - 60, f"Fecha: {compra.fecha.strftime('%d/%m/%Y %H:%M')}")
+	c.drawString(30, height - 75, f"Proveedor: {proveedor.nombre if proveedor else '-'}")
+	c.drawString(30, height - 90, f"Contacto: {proveedor.contacto if proveedor else '-'}")
+	c.drawString(30, height - 105, f"Email: {proveedor.email if proveedor else '-'}")
+
+	# Tabla de productos
+	c.setFont("Helvetica-Bold", 11)
+	c.drawString(30, height - 130, "Producto")
+	c.drawString(220, height - 130, "Cantidad")
+	c.drawString(300, height - 130, "Precio Unitario")
+	c.drawString(420, height - 130, "Subtotal")
+	c.setFont("Helvetica", 10)
+	y = height - 145
+	for d in detalles:
+		nombre = d.producto.nombre if hasattr(d.producto, 'nombre') else str(d.id_producto)
+		c.drawString(30, y, nombre)
+		c.drawString(220, y, str(d.cantidad))
+		c.drawString(300, y, f"{float(d.precio_unitario):.2f}")
+		c.drawString(420, y, f"{float(d.subtotal):.2f}")
+		y -= 15
+		if y < 80:
+			c.showPage()
+			y = height - 40
+
+	# Subtotal y total
+	c.setFont("Helvetica-Bold", 11)
+	c.drawString(300, y - 10, "TOTAL:")
+	c.drawString(420, y - 10, f"{float(compra.total):.2f}")
+
+	c.save()
+	buffer.seek(0)
+	return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"inline; filename=compra_{id_compra}.pdf"})
 
 # 1️⃣5️⃣ Confirmar compra
 @router.post("/{id_compra}/confirmar", response_model=schemas.CompraResponse)

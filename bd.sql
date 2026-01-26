@@ -468,3 +468,19 @@ CREATE TABLE notificacion_email_log (
 
     FOREIGN KEY (id_notificacion) REFERENCES notificacion(id_notificacion)
 );
+
+CREATE TABLE evento_sistema (
+    id_evento SERIAL PRIMARY KEY,
+    id_microempresa INTEGER NOT NULL,
+
+    tipo_evento VARCHAR(60) NOT NULL,
+    referencia_id INTEGER,
+    descripcion TEXT,
+
+    fecha_evento TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_evento_microempresa
+        FOREIGN KEY (id_microempresa)
+        REFERENCES microempresas(id_microempresa)
+        ON DELETE CASCADE
+);

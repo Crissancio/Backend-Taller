@@ -39,47 +39,24 @@ def generar_evento(tipo_evento: str, mensaje: str, id_microempresa: int, referen
     try:
         db.add(evento)
         db.flush()  # Obtener id_evento
-        # Buscar usuarios de la microempresa
-        usuarios = db.query(Usuario).filter_by(id_microempresa=id_microempresa).all()
+        # Buscar usuarios de la microempresa (admins y vendedores)
+        from app.users.models import AdminMicroempresa, Vendedor
+        admin_ids = db.query(AdminMicroempresa.id_usuario).filter_by(id_microempresa=id_microempresa).all()
+        vendedor_ids = db.query(Vendedor.id_usuario).filter_by(id_microempresa=id_microempresa).all()
+        ids = [id for (id,) in admin_ids + vendedor_ids]
+        usuarios = db.query(Usuario).filter(Usuario.id_usuario.in_(ids)).all()
         for usuario in usuarios:
-            # Validar usuario
             if not usuario:
                 continue
-            # Preferencias activas para este evento
-            prefs = db.query(models.PreferenciaNotificacion).filter_by(
+            # ARREGLO PARCIAL: Siempre crear notificación IN_APP para todos los usuarios
+            crear_notificacion_usuario(
+                db=db,
+                id_microempresa=id_microempresa,
                 id_usuario=usuario.id_usuario,
                 tipo_evento=tipo_evento,
-                activo=True
-            ).all()
-            for pref in prefs:
-                # Notificación interna
-                if pref.canal == "IN_APP":
-                    crear_notificacion_usuario(
-                        db=db,
-                        id_microempresa=id_microempresa,
-                        id_usuario=usuario.id_usuario,
-                        tipo_evento=tipo_evento,
-                        canal="IN_APP",
-                        mensaje=mensaje
-                    )
-                # Notificación por email
-                if pref.canal == "EMAIL":
-                    if usuario.email:
-                        crear_notificacion_usuario(
-                            db=db,
-                            id_microempresa=id_microempresa,
-                            id_usuario=usuario.id_usuario,
-                            tipo_evento=tipo_evento,
-                            canal="EMAIL",
-                            mensaje=mensaje
-                        )
-                        enviar_email_notificacion(
-                            db=db,
-                            usuario=usuario,
-                            asunto=f"Notificación: {tipo_evento}",
-                            mensaje=mensaje,
-                            id_evento=evento.id_evento
-                        )
+                canal="IN_APP",
+                mensaje=mensaje
+            )
         db.commit()
         return evento
     except SQLAlchemyError as e:

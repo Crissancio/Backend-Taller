@@ -1,3 +1,4 @@
+reportlab
 # Core FastAPI backend
 fastapi
 uvicorn[standard]

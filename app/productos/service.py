@@ -228,22 +228,20 @@ def listar_productos_activos_con_stock_por_microempresa(db: Session, id_microemp
         .all()
     )
 
+
 def listar_productos_activos_por_microempresa(db: Session, id_microempresa: int):
     return db.query(models.Producto).filter(
         models.Producto.id_microempresa == id_microempresa,
         models.Producto.estado == True
     ).all()
 
-def listar_productos_inactivos_sin_stock_por_microempresa(db: Session, id_microempresa: int):
-    from app.inventario.models import Stock
-    return (
-        db.query(models.Producto)
-        .join(Stock, models.Producto.id_producto == Stock.id_producto)
-        .filter(models.Producto.id_microempresa == id_microempresa)
-        .filter(models.Producto.estado == False)
-        .filter(Stock.cantidad == 0)
-        .all()
-    )
+# NUEVA FUNCIÓN: Listar productos inactivos por microempresa
+def listar_productos_inactivos_por_microempresa(db: Session, id_microempresa: int):
+    return db.query(models.Producto).filter(
+        models.Producto.id_microempresa == id_microempresa,
+        models.Producto.estado == False
+    ).all()
+
 
 def listar_productos_con_stock_por_microempresa(db: Session, id_microempresa: int):
     from app.inventario.models import Stock

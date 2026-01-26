@@ -36,6 +36,14 @@ def listar_productos_portal_publico(id_microempresa: int, db: Session = Depends(
     """
     return service.listar_productos_portal_publico(db, id_microempresa)
 
+# --- NUEVO ENDPOINT: Listar productos inactivos por microempresa ---
+@router.get("/microempresa/{id_microempresa}/inactivos", response_model=list[schemas.ProductoResponse])
+def listar_productos_inactivos_por_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    """
+    Lista todos los productos inactivos de una microempresa.
+    """
+    return service.listar_productos_inactivos_por_microempresa(db, id_microempresa)
+
 @router.get("/microempresa/{id_microempresa}/buscar", response_model=list[schemas.ProductoResponse])
 def filtrar_productos_por_microempresa_y_nombre(id_microempresa: int, nombre: str, db: Session = Depends(get_db)):
     return service.filtrar_productos_por_microempresa_y_nombre(db, id_microempresa, nombre)
@@ -259,9 +267,7 @@ def listar_productos_activos_con_stock_por_microempresa(id_microempresa: int, db
 def listar_productos_activos_por_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
     return service.listar_productos_activos_por_microempresa(db, id_microempresa)
 
-@router.get("/microempresa/{id_microempresa}/inactivos-sin-stock", response_model=list[schemas.ProductoResponse])
-def listar_productos_inactivos_sin_stock_por_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
-    return service.listar_productos_inactivos_sin_stock_por_microempresa(db, id_microempresa)
+
 
 @router.get("/microempresa/{id_microempresa}/buscar-nombre", response_model=list[schemas.ProductoResponse])
 def buscar_productos_por_nombre_microempresa(id_microempresa: int, nombre: str, db: Session = Depends(get_db)):
