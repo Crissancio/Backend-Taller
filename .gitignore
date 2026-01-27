@@ -16,6 +16,7 @@ env/
 
 # --- Archivos Multimedia
 public/productos/*
+public/*
 
 #mantener la carpeta public para las imagenes
 !public/productos/.gitkeep
