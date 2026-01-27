@@ -83,11 +83,62 @@ def registrar_superadmin(data: schemas.RegistroSuperAdmin, db: Session = Depends
 
 # ---------- RECUPERACIÓN DE CONTRASEÑA ----------
 
-# Endpoint para solicitar recuperación de contraseña (sin envío de correo temporalmente)
+
+# Endpoint para solicitar recuperación de contraseña (con captcha y envío de correo)
+
+from captcha.image import ImageCaptcha
+from fastapi import Request
+from app.core.email_utils import send_recovery_email
+from fastapi import Form
+import base64
+import io
+import uuid
+import threading
+
+# Diccionario global para almacenar captchas temporales (uuid: texto)
+_captcha_store = {}
+_captcha_lock = threading.Lock()
+
+# Endpoint para obtener un captcha (GET)
+@router.get("/recover/captcha")
+def get_captcha():
+    import random, string
+    image = ImageCaptcha(width=200, height=70)
+    captcha_text = ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    captcha_id = str(uuid.uuid4())
+    data = image.generate(captcha_text)
+    image_bytes = data.read()
+    image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+    # Guardar captcha en memoria (con lock por seguridad)
+    with _captcha_lock:
+        _captcha_store[captcha_id] = captcha_text
+    return {"captcha": image_b64, "captcha_id": captcha_id}
+
+# Endpoint para solicitar recuperación de contraseña (POST)
+from sqlalchemy.orm import Session
+from app.auth.service import get_user_by_email
+
 @router.post("/recover")
-def recover(data: schemas.RecuperacionRequest):
-    token = service.generar_token_recuperacion(data.email)
-    return {"reset_token": token}
+def recover(
+    email: str = Form(...),
+    captcha_id: str = Form(...),
+    captcha_input: str = Form(...),
+    db: Session = Depends(get_db),
+    request: Request = None
+):
+    # Validar existencia del email
+    user = get_user_by_email(db, email)
+    if not user:
+        return {"ok": False, "detail": "El correo no está registrado"}
+    # Validar captcha seguro
+    with _captcha_lock:
+        captcha_text = _captcha_store.pop(captcha_id, None)
+    if not captcha_text or not captcha_input or captcha_text.strip().upper() != captcha_input.strip().upper():
+        return {"ok": False, "detail": "Captcha incorrecto o expirado"}
+    token = service.generar_token_recuperacion(email)
+    # Enviar correo con el token
+    send_recovery_email(email, token)
+    return {"ok": True, "detail": "Correo de recuperación enviado", "email": email}
 
 
 @router.put("/admin/{id_usuario}/asignar-microempresa")

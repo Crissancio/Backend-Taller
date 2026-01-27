@@ -41,24 +41,44 @@ EMAIL_FROM = os.getenv("EMAIL_FROM", EMAIL_HOST_USER)
 
 
 def send_recovery_email(to_email: str, token: str):
+    import datetime
     subject = "Recuperación de contraseña"
+    now = datetime.datetime.now()
+    fecha = now.strftime('%d/%m/%Y')
+    hora = now.strftime('%H:%M:%S')
+    # Intentar obtener IP pública (si está en contexto web)
+    ip = None  # No se obtiene IP aquí, pero se deja el campo
+
+    # HTML amigable y profesional
     body = f"""
-    Hola,
-
-    Has solicitado restablecer tu contraseña. Utiliza el siguiente token para continuar con el proceso:
-
-    TOKEN: {token}
-
-    Si no solicitaste este cambio, ignora este correo.
-
-    Saludos,
-    Soporte
+    <div style='font-family: Arial, sans-serif; background: #f7f7f7; padding: 32px;'>
+      <div style='max-width: 480px; margin: auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001; padding: 32px;'>
+        <h2 style='color: #2d7ff9; margin-bottom: 8px;'>Recuperación de contraseña</h2>
+        <p style='color: #333;'>Hola,</p>
+        <p style='color: #333;'>Has solicitado restablecer tu contraseña en <b>Backend-Taller</b>.</p>
+        <p style='color: #333;'>Utiliza el siguiente token para continuar con el proceso:</p>
+        <div style='margin: 24px 0; text-align: center;'>
+          <div style='font-size: 1.3em; background: #f2f6fa; border: 1px solid #2d7ff9; border-radius: 8px; padding: 16px 8px; display: inline-block; word-break: break-all; user-select: all; color: #222; margin-bottom: 8px;'>
+            {token}
+          </div>
+          <div style='color: #666; font-size: 0.98em; margin-top: 6px;'>Selecciona y copia el token manualmente.</div>
+        </div>
+        <ul style='color: #555; font-size: 0.95em; background: #f2f6fa; border-radius: 6px; padding: 12px 18px;'>
+          <li><b>Correo destino:</b> {to_email}</li>
+          <li><b>Fecha:</b> {fecha}</li>
+          <li><b>Hora:</b> {hora}</li>
+          <li><b>IP de solicitud:</b> {ip}</li>
+        </ul>
+        <p style='color: #888; font-size: 0.95em; margin-top: 18px;'>Si no solicitaste este cambio, puedes ignorar este correo.</p>
+        <p style='color: #2d7ff9; font-size: 1.1em; margin-top: 24px;'>Equipo Backend-Taller</p>
+      </div>
+    </div>
     """
     msg = MIMEMultipart()
     msg["From"] = EMAIL_FROM
     msg["To"] = to_email
     msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
+    msg.attach(MIMEText(body, "html"))
 
     try:
         with smtplib.SMTP(EMAIL_HOST, EMAIL_PORT) as server:

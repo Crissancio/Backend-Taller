@@ -1,3 +1,5 @@
+# Captcha para recuperación de contraseña
+captcha==0.5.0
 reportlab
 # Core FastAPI backend
 fastapi
