@@ -42,3 +42,11 @@ class Microempresa(Base):
     admins = relationship("AdminMicroempresa", back_populates="microempresa")
     vendedores = relationship("Vendedor", back_populates="microempresa")
     clientes = relationship("Cliente", back_populates="microempresa")
+
+    @property
+    def estado(self):
+        return self.activo
+
+    @estado.setter
+    def estado(self, value):
+        self.activo = value

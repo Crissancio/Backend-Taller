@@ -82,7 +82,7 @@ class MicroempresaUpdate(BaseModel):
 
 class MicroempresaResponse(MicroempresaBase):
     id_microempresa: int
-    activo: bool
+    estado: bool
     fecha_registro: datetime
     rubro: Optional[RubroResponse] = None
 

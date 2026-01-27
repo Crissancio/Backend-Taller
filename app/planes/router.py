@@ -63,18 +63,7 @@ def eliminar_plan(id_plan: int, db: Session = Depends(get_db)):
     return {"detail": "Plan eliminado"}
 
 
-@router.get("/total/activos", response_model=dict)
-def total_planes_activos(db: Session = Depends(get_db)):
-    cantidad = db.query(service.models.Plan).filter_by(activo=True).count()
-    return {"cantidad": cantidad}
 
-@router.get("/activos", response_model=list[schemas.PlanResponse])
-def listar_planes_activos(db: Session = Depends(get_db)):
-    return db.query(service.models.Plan).filter_by(activo=True).all()
-
-@router.get("/no-activos", response_model=list[schemas.PlanResponse])
-def listar_planes_no_activos(db: Session = Depends(get_db)):
-    return db.query(service.models.Plan).filter_by(activo=False).all()
 
 # Activar un plan
 @router.put("/{id_plan}/activar", response_model=schemas.PlanResponse)

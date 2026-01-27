@@ -16,6 +16,7 @@ router = APIRouter(
 class VendedorUpdate(BaseModel):
     nombre: str
     email: EmailStr
+    password: str | None = None  # Opcional - solo se actualiza si se proporciona
 
 
 # Listar vendedores SOLO aquí
@@ -88,6 +89,7 @@ def eliminar_vendedor(id_usuario: int, db: Session = Depends(get_db), user=Depen
 
 @router.put("/{id_usuario}", response_model=UsuarioResponse)
 def actualizar_vendedor(id_usuario: int, data: VendedorUpdate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    from app.auth.utils import hash_password
     rol = get_user_role(user, db)
     vendedor = db.query(Vendedor).filter_by(id_usuario=id_usuario).first()
     if not vendedor:
@@ -96,13 +98,23 @@ def actualizar_vendedor(id_usuario: int, data: VendedorUpdate, db: Session = Dep
     existe = db.query(Usuario).filter(Usuario.email == data.email, Usuario.id_usuario != id_usuario).first()
     if existe:
         raise HTTPException(status_code=400, detail="Email ya registrado")
-    if rol == 'superadmin' or (rol == 'vendedor' and user.id_usuario == id_usuario):
+    # Permitir a adminmicroempresa de la misma empresa
+    if rol == 'superadmin' or (rol == 'adminmicroempresa' and user.admin_microempresa.id_microempresa == vendedor.id_microempresa) or (rol == 'vendedor' and user.id_usuario == id_usuario):
         usuario = vendedor.usuario
         usuario.nombre = data.nombre
         usuario.email = data.email
+        # Actualizar contraseña si se proporcionó
+        if data.password and len(data.password) >= 6:
+            usuario.password_hash = hash_password(data.password)
         db.commit()
         db.refresh(usuario)
-        return usuario
+        return {
+            "id_usuario": usuario.id_usuario,
+            "nombre": usuario.nombre,
+            "email": usuario.email,
+            "estado": usuario.estado,
+            "rol": "vendedor"
+        }
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
 
