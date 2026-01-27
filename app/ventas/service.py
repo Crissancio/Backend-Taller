@@ -53,7 +53,7 @@ def crear_venta(db: Session, venta: schemas.VentaCreate):
     db.add(db_venta)
     db.commit()
     db.refresh(db_venta)
-    # Crear detalles y descontar stock
+    # Crear detalles (NO descontar stock aquí)
     for det in venta.detalles:
         db_det = models.DetalleVenta(
             id_venta=db_venta.id_venta,
@@ -63,11 +63,6 @@ def crear_venta(db: Session, venta: schemas.VentaCreate):
             subtotal=det.subtotal
         )
         db.add(db_det)
-        # Descontar stock
-        stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
-        stock.cantidad -= det.cantidad
-        stock.ultima_actualizacion = datetime.now()
-        db.add(stock)
     # Crear pagos 
     if venta.pagos:
         for pag in venta.pagos:
@@ -167,31 +162,6 @@ def crear_venta_presencial(db: Session, id_microempresa: int, venta: schemas.Ven
             subtotal=det.cantidad * det.precio_unitario
         )
         db.add(db_det)
-        # Descontar stock
-        stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
-        if not stock:
-            raise HTTPException(status_code=400, detail=f"No existe stock para el producto {det.id_producto}")
-        stock.cantidad -= det.cantidad
-        stock.ultima_actualizacion = datetime.now()
-        db.commit()
-        # Evento de stock bajo o agotado
-        producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
-        if stock.cantidad == 0:
-            notif_service.generar_evento(
-                tipo_evento="STOCK_AGOTADO",
-                mensaje=f"El producto '{producto.nombre}' se ha agotado (stock=0)",
-                id_microempresa=id_microempresa,
-                referencia_id=producto.id_producto,
-                db=db
-            )
-        elif stock.cantidad <= stock.stock_minimo:
-            notif_service.generar_evento(
-                tipo_evento="STOCK_BAJO",
-                mensaje=f"El producto '{producto.nombre}' está bajo el stock mínimo.",
-                id_microempresa=id_microempresa,
-                referencia_id=producto.id_producto,
-                db=db
-            )
     db.commit()
     db.refresh(db_venta)
     # Evento de venta pagada
@@ -275,7 +245,7 @@ def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data: di
     db.commit()
     db.refresh(db_venta)
 
-    # 4. Crear detalles y descontar stock
+    # 4. Crear detalles (NO descontar stock aquí)
     for det in venta.detalles:
         db_det = models.DetalleVenta(
             id_venta=db_venta.id_venta,
@@ -285,12 +255,6 @@ def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data: di
             subtotal=det.cantidad * det.precio_unitario
         )
         db.add(db_det)
-        # Descontar stock
-        stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
-        stock.cantidad -= det.cantidad
-        stock.ultima_actualizacion = datetime.now()
-        db.add(stock)
-    
     db.commit()
     db.refresh(db_venta)
     return db_venta
