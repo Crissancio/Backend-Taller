@@ -44,49 +44,91 @@ def obtener_compra_completa(id_compra: int, db: Session = Depends(get_db)):
 # PDF de factura de compra
 @router.get("/{id_compra}/pdf")
 def generar_pdf_compra(id_compra: int, db: Session = Depends(get_db)):
+
 	from reportlab.lib.pagesizes import letter
 	from reportlab.pdfgen import canvas
 	from reportlab.lib.units import mm
+	from reportlab.lib import colors
 	import datetime
 
 	compra, detalles, _ = service.obtener_compra_completa(db, id_compra)
 	proveedor = compra.proveedor
+	microempresa = compra.microempresa
 	buffer = io.BytesIO()
 	c = canvas.Canvas(buffer, pagesize=letter)
 	width, height = letter
 
-	# Encabezado
-	c.setFont("Helvetica-Bold", 16)
-	c.drawString(30, height - 40, "Factura de Compra")
+	# Encabezado profesional
+	c.setFillColor(colors.HexColor('#003366'))
+	c.rect(0, height-70, width, 70, fill=1, stroke=0)
+	c.setFillColor(colors.white)
+	c.setFont("Helvetica-Bold", 20)
+	c.drawString(30, height - 40, f"{microempresa.nombre if microempresa else 'Microempresa'}")
+	c.setFont("Helvetica-Bold", 14)
+	c.drawString(30, height - 65, "Factura de Compra")
 	c.setFont("Helvetica", 10)
-	c.drawString(30, height - 60, f"Fecha: {compra.fecha.strftime('%d/%m/%Y %H:%M')}")
-	c.drawString(30, height - 75, f"Proveedor: {proveedor.nombre if proveedor else '-'}")
-	c.drawString(30, height - 90, f"Contacto: {proveedor.contacto if proveedor else '-'}")
-	c.drawString(30, height - 105, f"Email: {proveedor.email if proveedor else '-'}")
+	c.setFillColor(colors.white)
+	c.drawString(400, height - 40, f"Fecha: {compra.fecha.strftime('%d/%m/%Y %H:%M')}")
+	c.drawString(400, height - 55, f"N° Compra: {compra.id_compra}")
+	c.setFillColor(colors.black)
 
-	# Tabla de productos
+	# Datos proveedor
+	y = height - 90
 	c.setFont("Helvetica-Bold", 11)
-	c.drawString(30, height - 130, "Producto")
-	c.drawString(220, height - 130, "Cantidad")
-	c.drawString(300, height - 130, "Precio Unitario")
-	c.drawString(420, height - 130, "Subtotal")
+	c.drawString(30, y, "Proveedor:")
 	c.setFont("Helvetica", 10)
-	y = height - 145
+	c.drawString(110, y, proveedor.nombre if proveedor else '-')
+	y -= 15
+	c.setFont("Helvetica-Bold", 11)
+	c.drawString(30, y, "Contacto:")
+	c.setFont("Helvetica", 10)
+	c.drawString(110, y, proveedor.contacto if proveedor else '-')
+	y -= 15
+	c.setFont("Helvetica-Bold", 11)
+	c.drawString(30, y, "Email:")
+	c.setFont("Helvetica", 10)
+	c.drawString(110, y, proveedor.email if proveedor else '-')
+
+	# Tabla de productos con bordes
+	y -= 30
+	c.setFont("Helvetica-Bold", 11)
+	c.setFillColor(colors.HexColor('#003366'))
+	c.rect(30, y-5, width-60, 20, fill=1, stroke=0)
+	c.setFillColor(colors.white)
+	c.drawString(35, y, "Producto")
+	c.drawString(220, y, "Cantidad")
+	c.drawString(300, y, "Precio Unitario")
+	c.drawString(420, y, "Subtotal")
+	c.setFillColor(colors.black)
+	c.setFont("Helvetica", 10)
+	y -= 20
 	for d in detalles:
 		nombre = d.producto.nombre if hasattr(d.producto, 'nombre') else str(d.id_producto)
-		c.drawString(30, y, nombre)
-		c.drawString(220, y, str(d.cantidad))
-		c.drawString(300, y, f"{float(d.precio_unitario):.2f}")
-		c.drawString(420, y, f"{float(d.subtotal):.2f}")
-		y -= 15
-		if y < 80:
+		c.rect(30, y-2, width-60, 18, fill=0, stroke=1)
+		c.drawString(35, y, nombre)
+		c.drawRightString(260, y, str(d.cantidad))
+		c.drawRightString(370, y, f"{float(d.precio_unitario):.2f}")
+		c.drawRightString(500, y, f"{float(d.subtotal):.2f}")
+		y -= 18
+		if y < 100:
 			c.showPage()
-			y = height - 40
+			y = height - 100
 
-	# Subtotal y total
-	c.setFont("Helvetica-Bold", 11)
-	c.drawString(300, y - 10, "TOTAL:")
-	c.drawString(420, y - 10, f"{float(compra.total):.2f}")
+	# Línea total
+	c.setFont("Helvetica-Bold", 12)
+	c.setFillColor(colors.HexColor('#003366'))
+	c.line(300, y-5, 550, y-5)
+	c.drawString(300, y-20, "TOTAL:")
+	c.drawRightString(500, y-20, f"{float(compra.total):.2f}")
+	c.setFillColor(colors.black)
+
+	# Observaciones
+	if compra.observacion:
+		y -= 40
+		c.setFont("Helvetica-Bold", 11)
+		c.drawString(30, y, "Observaciones:")
+		c.setFont("Helvetica", 10)
+		c.drawString(130, y, compra.observacion)
 
 	c.save()
 	buffer.seek(0)

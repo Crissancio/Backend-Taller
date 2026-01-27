@@ -33,6 +33,7 @@ CREATE TABLE planes (
 );
 
 -- Tabla: microempresas
+/*
 CREATE TABLE microempresas (
     id_microempresa SERIAL PRIMARY KEY,
     nombre VARCHAR NOT NULL,
@@ -45,6 +46,123 @@ CREATE TABLE microempresas (
     horario_atencion VARCHAR,
     estado BOOLEAN DEFAULT TRUE,
     fecha_registro TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);*/
+-- Tabla: rubro
+CREATE TABLE rubro (
+    id_rubro SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL UNIQUE,
+    descripcion TEXT,
+    activo BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+/*
+BEGIN; -- Inicio de la transacción
+
+-- 1. Crear la tabla 'rubro'
+CREATE TABLE IF NOT EXISTS rubro (
+    id_rubro SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL UNIQUE,
+    descripcion TEXT,
+    activo BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+-- 2. Insertar rubro por defecto (si no existe)
+INSERT INTO rubro (nombre, descripcion) 
+VALUES ('RUBRO DEFAULT', 'Rubro asignado por defecto en migración')
+ON CONFLICT (nombre) DO NOTHING; -- Evita error si corres el script dos veces
+
+-- 3. Modificaciones a la tabla 'microempresas'
+
+-- A) Renombrar columna estado -> activo
+ALTER TABLE microempresas RENAME COLUMN estado TO activo;
+
+-- B) Cambiar defaults y restricciones de 'activo'
+ALTER TABLE microempresas ALTER COLUMN activo SET DEFAULT FALSE;
+ALTER TABLE microempresas ALTER COLUMN activo SET NOT NULL;
+
+-- C) ELIMINAR LA COLUMNA IMPUESTOS
+ALTER TABLE microempresas DROP COLUMN IF EXISTS impuestos;
+
+-- D) Agregar las nuevas columnas
+ALTER TABLE microempresas 
+    ADD COLUMN correo_contacto VARCHAR(150),
+    ADD COLUMN tipo_atencion VARCHAR(20),
+    ADD COLUMN latitud NUMERIC(10,7),
+    ADD COLUMN longitud NUMERIC(10,7),
+    ADD COLUMN dias_atencion VARCHAR(100),
+    ADD COLUMN id_rubro INTEGER;
+
+-- E) Llenar datos obligatorios para filas existentes
+-- Asignar 'PRESENCIAL' a los registros viejos para cumplir con el NOT NULL futuro
+UPDATE microempresas SET tipo_atencion = 'PRESENCIAL' WHERE tipo_atencion IS NULL;
+
+-- Asegurar que moneda tenga valor (por si acaso)
+UPDATE microempresas SET moneda = 'BOB' WHERE moneda IS NULL;
+
+-- Asignar el rubro creado a las empresas existentes
+UPDATE microempresas 
+SET id_rubro = (SELECT id_rubro FROM rubro WHERE nombre = 'RUBRO DEFAULT')
+WHERE id_rubro IS NULL;
+
+-- F) Ajustar tipos de datos y recortes de texto
+-- Usamos 'USING SUBSTRING' para no perder datos, solo cortarlos si son muy largos
+
+ALTER TABLE microempresas 
+    ALTER COLUMN nombre TYPE VARCHAR(150) USING SUBSTRING(nombre, 1, 150),
+    ALTER COLUMN nit TYPE VARCHAR(30) USING SUBSTRING(nit, 1, 30),
+    ALTER COLUMN direccion TYPE VARCHAR(255) USING SUBSTRING(direccion, 1, 255),
+    ALTER COLUMN telefono TYPE VARCHAR(30) USING SUBSTRING(telefono, 1, 30),
+    ALTER COLUMN horario_atencion TYPE VARCHAR(150) USING SUBSTRING(horario_atencion, 1, 150),
+    ALTER COLUMN moneda TYPE VARCHAR(10) USING SUBSTRING(moneda, 1, 10),
+    ALTER COLUMN moneda SET NOT NULL,
+    ALTER COLUMN logo TYPE TEXT,
+    ALTER COLUMN fecha_registro TYPE TIMESTAMP USING fecha_registro::TIMESTAMP,
+    ALTER COLUMN fecha_registro SET NOT NULL;
+
+-- G) Aplicar restricciones finales (Constraints)
+
+-- Restricción CHECK para tipo_atencion
+ALTER TABLE microempresas 
+    ALTER COLUMN tipo_atencion SET NOT NULL,
+    ADD CONSTRAINT chk_tipo_atencion CHECK (tipo_atencion IN ('PRESENCIAL', 'VIRTUAL', 'HIBRIDA'));
+
+-- Llave foránea para rubro
+ALTER TABLE microempresas 
+    ADD CONSTRAINT fk_microempresa_rubro 
+    FOREIGN KEY (id_rubro) REFERENCES rubro(id_rubro);
+
+COMMIT; -- Confirmar cambios
+*/
+
+-- Tabla: microempresas
+
+CREATE TABLE microempresas(
+    id_microempresa SERIAL PRIMARY KEY,
+    nombre VARCHAR(150) NOT NULL,
+    nit VARCHAR(30) NOT NULL UNIQUE,
+
+    correo_contacto VARCHAR(150),
+    direccion VARCHAR(255),
+    telefono VARCHAR(30),
+    tipo_atencion VARCHAR(20) NOT NULL CHECK (tipo_atencion IN ('PRESENCIAL', 'VIRTUAL', 'HIBRIDA')),
+    latitud NUMERIC(10,7),
+    longitud NUMERIC(10,7),
+
+    dias_atencion VARCHAR(100), -- Ej: "Lunes a Viernes"
+    horario_atencion VARCHAR(150),
+
+    moneda VARCHAR(10) NOT NULL,
+
+    logo TEXT,
+
+    id_rubro INTEGER,
+
+    activo BOOLEAN NOT NULL DEFAULT FALSE,
+    fecha_registro TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_microempresa_rubro
+        FOREIGN KEY (id_rubro)
+        REFERENCES rubro(id_rubro)
 );
 
 -- Índices para microempresas

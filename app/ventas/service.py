@@ -14,6 +14,34 @@ from sqlalchemy import text
 # --- CRUD BÁSICO ---
 
 def crear_venta(db: Session, venta: schemas.VentaCreate):
+    # Validar stock antes de registrar la venta
+    from app.inventario.models import Stock
+    errores_stock = []
+    for det in venta.detalles:
+        stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
+        if not stock:
+            errores_stock.append({
+                "id_producto": det.id_producto,
+                "error": "Producto no encontrado en inventario",
+                "cantidad_solicitada": det.cantidad,
+                "stock_disponible": 0
+            })
+        elif stock.cantidad < det.cantidad:
+            errores_stock.append({
+                "id_producto": det.id_producto,
+                "error": "Stock insuficiente",
+                "cantidad_solicitada": det.cantidad,
+                "stock_disponible": stock.cantidad
+            })
+    if errores_stock:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "mensaje": "No se puede registrar la venta por problemas de stock.",
+                "errores": errores_stock
+            }
+        )
+
     db_venta = models.Venta(
         id_microempresa=venta.id_microempresa,
         id_cliente=venta.id_cliente,
@@ -25,7 +53,7 @@ def crear_venta(db: Session, venta: schemas.VentaCreate):
     db.add(db_venta)
     db.commit()
     db.refresh(db_venta)
-    # Crear detalles
+    # Crear detalles y descontar stock
     for det in venta.detalles:
         db_det = models.DetalleVenta(
             id_venta=db_venta.id_venta,
@@ -35,6 +63,11 @@ def crear_venta(db: Session, venta: schemas.VentaCreate):
             subtotal=det.subtotal
         )
         db.add(db_det)
+        # Descontar stock
+        stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
+        stock.cantidad -= det.cantidad
+        stock.ultima_actualizacion = datetime.now()
+        db.add(stock)
     # Crear pagos 
     if venta.pagos:
         for pag in venta.pagos:
@@ -201,6 +234,34 @@ def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data: di
     # 2. Calcular total automáticamente
     total_calculado = sum([d.cantidad * d.precio_unitario for d in venta.detalles])
 
+    # Validar stock antes de registrar la venta online
+    from app.inventario.models import Stock
+    errores_stock = []
+    for det in venta.detalles:
+        stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
+        if not stock:
+            errores_stock.append({
+                "id_producto": det.id_producto,
+                "error": "Producto no encontrado en inventario",
+                "cantidad_solicitada": det.cantidad,
+                "stock_disponible": 0
+            })
+        elif stock.cantidad < det.cantidad:
+            errores_stock.append({
+                "id_producto": det.id_producto,
+                "error": "Stock insuficiente",
+                "cantidad_solicitada": det.cantidad,
+                "stock_disponible": stock.cantidad
+            })
+    if errores_stock:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "mensaje": "No se puede registrar la venta por problemas de stock.",
+                "errores": errores_stock
+            }
+        )
+
     # 3. Crear Venta
     db_venta = models.Venta(
         id_microempresa=venta.id_microempresa,
@@ -214,7 +275,7 @@ def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data: di
     db.commit()
     db.refresh(db_venta)
 
-    # 4. Crear detalles
+    # 4. Crear detalles y descontar stock
     for det in venta.detalles:
         db_det = models.DetalleVenta(
             id_venta=db_venta.id_venta,
@@ -224,6 +285,11 @@ def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data: di
             subtotal=det.cantidad * det.precio_unitario
         )
         db.add(db_det)
+        # Descontar stock
+        stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
+        stock.cantidad -= det.cantidad
+        stock.ultima_actualizacion = datetime.now()
+        db.add(stock)
     
     db.commit()
     db.refresh(db_venta)

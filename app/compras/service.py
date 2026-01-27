@@ -52,7 +52,7 @@ def crear_compra(db: Session, data: schemas.CompraCreate, id_microempresa: int =
                 continue
 
             subtotal = item.cantidad * item.precio_unitario
-            
+
             detalle = models.DetalleCompra(
                 id_compra=compra.id_compra,
                 id_producto=item.id_producto,
@@ -62,7 +62,7 @@ def crear_compra(db: Session, data: schemas.CompraCreate, id_microempresa: int =
             )
             db.add(detalle)
             total_acumulado += subtotal
-            
+
             # --- 🟢 ACTUALIZACIÓN DE STOCK (Lógica Robusta) ---
             try:
                 # Opción A: Usar servicio de inventario si existe
@@ -70,17 +70,23 @@ def crear_compra(db: Session, data: schemas.CompraCreate, id_microempresa: int =
                     inventario_service.aumentar_stock(db, item.id_producto, item.cantidad)
                 elif hasattr(inventario_service, 'ajuste_stock'):
                     inventario_service.ajuste_stock(db, item.id_producto, item.cantidad)
-                
                 # Opción B (Fallback): Actualizar modelo directamente
                 else:
                     if producto.stock is None:
                         producto.stock = 0
                     producto.stock += item.cantidad
                     db.add(producto) # Marcamos para guardar
-                    
             except Exception as e:
                 print(f"Advertencia: Error al actualizar stock para producto {item.id_producto}: {str(e)}")
             # ----------------------------------------------------
+
+            # --- 🟢 ACTUALIZACIÓN DE PRECIO DE COMPRA Y PRECIO DE VENTA ---
+            try:
+                producto.costo_compra = item.precio_unitario
+                producto.precio_venta = round(float(item.precio_unitario) * 1.105, 2)
+                db.add(producto)
+            except Exception as e:
+                print(f"Advertencia: Error al actualizar precios para producto {item.id_producto}: {str(e)}")
 
     # 5. Guardar Cambios Finales
     compra.total = total_acumulado

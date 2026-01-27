@@ -23,7 +23,7 @@ CREATE TABLE rubro (
 );
 
 
-CREATE TABLE microempresa (
+CREATE TABLE microempresas(
     id_microempresa SERIAL PRIMARY KEY,
     nombre VARCHAR(150) NOT NULL,
     nit VARCHAR(30) NOT NULL UNIQUE,
@@ -31,7 +31,7 @@ CREATE TABLE microempresa (
     correo_contacto VARCHAR(150),
     direccion VARCHAR(255),
     telefono VARCHAR(30),
-
+    tipo_atencion VARCHAR(20) NOT NULL CHECK (tipo_atencion IN ('PRESENCIAL', 'VIRTUAL', 'HIBRIDA')),
     latitud NUMERIC(10,7),
     longitud NUMERIC(10,7),
 

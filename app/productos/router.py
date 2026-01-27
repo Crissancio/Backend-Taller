@@ -108,8 +108,8 @@ def actualizar_categoria(id_categoria: int, categoria: schemas.CategoriaUpdate, 
     return result
 
 @router.delete("/categoria/{id_categoria}", response_model=schemas.CategoriaResponse)
-def baja_logica_categoria(id_categoria: int, db: Session = Depends(get_db)):
-    result = service.baja_logica_categoria(db, id_categoria)
+def eliminar_categoria(id_categoria: int, db: Session = Depends(get_db)):
+    result = service.eliminar_categoria(db, id_categoria)
     if not result:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
     return result

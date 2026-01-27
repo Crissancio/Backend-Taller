@@ -1,63 +1,79 @@
+
 from app.users.models import AdminMicroempresa, Vendedor
 from app.users.schemas import UsuarioResponse
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.microempresas import schemas, service
 from app.core.dependencies import get_current_user, get_user_role
+
 
 router = APIRouter(
     prefix="/microempresas",
     tags=["Microempresas"]
 )
 
+# Importar después de definir router para evitar NameError
+from app.users.models import AdminMicroempresa
+from app.users.schemas import UsuarioResponse
 
-# ENDPOINT: Obtener administradores de una microempresa por id
-@router.get("/{id_microempresa}/admins", response_model=list[UsuarioResponse])
-def obtener_admins_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
-    admins = db.query(AdminMicroempresa).filter_by(id_microempresa=id_microempresa).all()
-    return [
-        {
-            "id_usuario": adm.usuario.id_usuario,
-            "nombre": adm.usuario.nombre,
-            "email": adm.usuario.email,
-            "estado": adm.usuario.estado,
-            "rol": "adminmicroempresa",
-            "id_microempresa": adm.id_microempresa
-        }
-        for adm in admins
-    ]
+# ==================== RUBROS ====================
+@router.post("/rubros", response_model=schemas.RubroResponse)
+def crear_rubro(rubro: schemas.RubroCreate, db: Session = Depends(get_db)):
+    return service.crear_rubro(db, rubro)
 
-# ENDPOINT: Obtener vendedores de una microempresa por id
-@router.get("/{id_microempresa}/vendedores", response_model=list[UsuarioResponse])
-def obtener_vendedores_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
-    vendedores = db.query(Vendedor).filter_by(id_microempresa=id_microempresa).all()
-    return [
-        {
-            "id_usuario": v.usuario.id_usuario,
-            "nombre": v.usuario.nombre,
-            "email": v.usuario.email,
-            "estado": v.usuario.estado,
-            "rol": "vendedor",
-            "id_microempresa": v.id_microempresa
-        }
-        for v in vendedores
-    ]
+@router.put("/rubros/{id_rubro}", response_model=schemas.RubroResponse)
+def editar_rubro(id_rubro: int, rubro: schemas.RubroUpdate, db: Session = Depends(get_db)):
+    return service.actualizar_rubro(db, id_rubro, rubro)
 
-# CREAR (acceso para todos los roles autenticados)
+@router.get("/rubros", response_model=list[schemas.RubroResponse])
+def listar_rubros(db: Session = Depends(get_db)):
+    return service.listar_rubros(db)
+
+@router.get("/rubros/activos", response_model=list[schemas.RubroResponse])
+def listar_rubros_activos(db: Session = Depends(get_db)):
+    return service.listar_rubros(db, solo_activos=True)
+
+@router.patch("/rubros/{id_rubro}/estado", response_model=schemas.RubroResponse)
+def cambiar_estado_rubro(id_rubro: int, activo: bool = Body(...), db: Session = Depends(get_db)):
+    return service.cambiar_estado_rubro(db, id_rubro, activo)
+
+# ==================== MICROEMPRESAS ====================
 @router.post("/", response_model=schemas.MicroempresaResponse)
-def crear_empresa(empresa: schemas.MicroempresaCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    try:
-        return service.crear_microempresa(db, empresa)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+def crear_microempresa(empresa: schemas.MicroempresaCreate, db: Session = Depends(get_db)):
+    return service.crear_microempresa(db, empresa)
 
+@router.put("/{id_microempresa}", response_model=schemas.MicroempresaResponse)
+def actualizar_microempresa(id_microempresa: int, empresa: schemas.MicroempresaUpdate, db: Session = Depends(get_db)):
+    return service.actualizar_microempresa(db, id_microempresa, empresa)
 
-# --- RUTAS DE ESTADÍSTICAS ---
-@router.get("/total", response_model=dict)
-def total_microempresas(db: Session = Depends(get_db)):
-    cantidad = db.query(service.models.Microempresa).count()
-    return {"cantidad": cantidad}
+@router.get("/", response_model=list[schemas.MicroempresaResponse])
+def listar_microempresas(db: Session = Depends(get_db)):
+    return service.listar_microempresas(db)
+
+@router.get("/{id_microempresa}", response_model=schemas.MicroempresaResponse)
+def obtener_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    return service.obtener_microempresa(db, id_microempresa)
+
+@router.get("/rubro/{id_rubro}", response_model=list[schemas.MicroempresaResponse])
+def listar_microempresas_por_rubro(id_rubro: int, db: Session = Depends(get_db)):
+    return service.listar_microempresas_por_rubro(db, id_rubro)
+
+@router.get("/activas", response_model=list[schemas.MicroempresaResponse])
+def listar_microempresas_activas(db: Session = Depends(get_db)):
+    return service.listar_microempresas(db, solo_activas=True)
+
+@router.patch("/{id_microempresa}/activar", response_model=schemas.MicroempresaResponse)
+def activar_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    return service.activar_microempresa(db, id_microempresa)
+
+@router.patch("/{id_microempresa}/desactivar", response_model=schemas.MicroempresaResponse)
+def desactivar_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    return service.desactivar_microempresa(db, id_microempresa)
+
+@router.patch("/{id_microempresa}/logo", response_model=schemas.MicroempresaResponse)
+def subir_logo_microempresa(id_microempresa: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    return service.subir_logo_microempresa(db, id_microempresa, file)
 
 @router.get("/total/activas", response_model=dict)
 def total_microempresas_activas(db: Session = Depends(get_db)):
@@ -140,9 +156,6 @@ def listar_microempresas_inactivas(db: Session = Depends(get_db), user=Depends(g
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
 
-# SUSCRIPCIÓN (solo superadmin o admin de esa microempresa)
-@router.post("/{id_microempresa}/suscripcion", response_model=schemas.SuscripcionResponse)
-    # This subscription route has been removed as there is a dedicated module for subscriptions.
 # --- CRUD MICROEMPRESA (restricciones) ---
 # OBTENER
 
@@ -233,5 +246,39 @@ def desactivar_microempresa(id_microempresa: int, db: Session = Depends(get_db),
         raise HTTPException(status_code=403, detail="No autorizado")
 
 
+# ==================== ADMINISTRADORES DE MICROEMPRESA ====================
+@router.get("/{id_microempresa}/admins", response_model=list[UsuarioResponse])
+def obtener_admins_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    admins = db.query(AdminMicroempresa).filter_by(id_microempresa=id_microempresa).all()
+    result = []
+    for a in admins:
+        usuario = a.usuario
+        # Construir el dict con todos los campos requeridos por UsuarioResponse
+        result.append({
+            "id_usuario": usuario.id_usuario,
+            "nombre": usuario.nombre,
+            "email": usuario.email,
+            "estado": usuario.estado,
+            "rol": "admin_microempresa",
+            "id_microempresa": id_microempresa
+        })
+    return result
 
 
+# ==================== VENDEDORES DE MICROEMPRESA ====================
+@router.get("/{id_microempresa}/vendedores", response_model=list[UsuarioResponse])
+def obtener_vendedores_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
+    from app.users.models import Vendedor
+    vendedores = db.query(Vendedor).filter_by(id_microempresa=id_microempresa).all()
+    result = []
+    for v in vendedores:
+        usuario = v.usuario
+        result.append({
+            "id_usuario": usuario.id_usuario,
+            "nombre": usuario.nombre,
+            "email": usuario.email,
+            "estado": usuario.estado,
+            "rol": "vendedor",
+            "id_microempresa": id_microempresa
+        })
+    return result

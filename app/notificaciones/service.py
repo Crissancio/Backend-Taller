@@ -136,7 +136,7 @@ from datetime import datetime
 
 def crear_notificacion(db: Session, notificacion: schemas.NotificacionCreate):
     import sys
-    print(f"[Notificaciones] Creando notificación para usuario {notificacion.id_usuario} (microempresa {notificacion.id_microempresa}) tipo: {notificacion.tipo} mensaje: {notificacion.mensaje}")
+    print(f"[Notificaciones] Creando notificación para usuario {notificacion.id_usuario} (microempresa {notificacion.id_microempresa}) tipo: {notificacion.tipo_evento} mensaje: {notificacion.mensaje}")
     # Convertimos el esquema a diccionario
     notificacion_data = notificacion.dict()
     # Creamos la instancia del modelo

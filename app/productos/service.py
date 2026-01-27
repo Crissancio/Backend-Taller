@@ -34,7 +34,7 @@ def actualizar_categoria(db: Session, id_categoria: int, categoria: schemas.Cate
     db.refresh(db_categoria)
     return db_categoria
 
-def baja_logica_categoria(db: Session, id_categoria: int):
+def eliminar_categoria(db: Session, id_categoria: int):
     from app.notificaciones import service as notif_service
     from app.notificaciones.schemas import NotificacionCreate
     from app.users.models import AdminMicroempresa
@@ -42,7 +42,7 @@ def baja_logica_categoria(db: Session, id_categoria: int):
     if db_categoria:
         id_microempresa = db_categoria.id_microempresa
         nombre_categoria = db_categoria.nombre
-        db_categoria.activo = False
+        db.delete(db_categoria)
         db.commit()
         # Notificar al admin de la microempresa
         admin = db.query(AdminMicroempresa).filter(AdminMicroempresa.id_microempresa == id_microempresa).first()
@@ -50,8 +50,9 @@ def baja_logica_categoria(db: Session, id_categoria: int):
             notificacion = NotificacionCreate(
                 id_microempresa=id_microempresa,
                 id_usuario=admin.id_usuario,
-                tipo="categoria",
-                mensaje=f"La categoría '{nombre_categoria}' ha sido eliminada (baja lógica)."
+                tipo_evento="categoria",
+                canal="IN_APP",
+                mensaje=f"La categoría '{nombre_categoria}' ha sido eliminada (baja física)."
             )
             notif_service.crear_notificacion(db, notificacion)
     return db_categoria
