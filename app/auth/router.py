@@ -30,8 +30,8 @@ from app.core.dependencies import get_current_user
 
 @router.post("/register/vendedor", response_model=UsuarioResponse)
 def registrar_vendedor(data: schemas.RegistroVendedor, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    # Usar el email como contraseña por defecto
-    password_defecto = data.email
+    # Usar contraseña proporcionada o email como default
+    password_final = data.password if data.password else data.email
     # Obtener el id_microempresa del admin autenticado
     rol = get_user_role(user, db)
     id_microempresa = None
@@ -43,7 +43,7 @@ def registrar_vendedor(data: schemas.RegistroVendedor, db: Session = Depends(get
     vendedor_data = schemas.RegistroVendedor(
         nombre=data.nombre,
         email=data.email,
-        password=password_defecto,
+        password=password_final,
         id_microempresa=id_microempresa
     )
     nuevo_usuario = service.crear_vendedor(db, vendedor_data)

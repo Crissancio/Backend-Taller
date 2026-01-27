@@ -43,47 +43,26 @@ def cambiar_estado_rubro(id_rubro: int, activo: bool = Body(...), db: Session = 
 def crear_microempresa(empresa: schemas.MicroempresaCreate, db: Session = Depends(get_db)):
     return service.crear_microempresa(db, empresa)
 
-@router.put("/{id_microempresa}", response_model=schemas.MicroempresaResponse)
-def actualizar_microempresa(id_microempresa: int, empresa: schemas.MicroempresaUpdate, db: Session = Depends(get_db)):
-    return service.actualizar_microempresa(db, id_microempresa, empresa)
-
-@router.get("/", response_model=list[schemas.MicroempresaResponse])
-def listar_microempresas(db: Session = Depends(get_db)):
-    return service.listar_microempresas(db)
-
-@router.get("/{id_microempresa}", response_model=schemas.MicroempresaResponse)
-def obtener_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
-    return service.obtener_microempresa(db, id_microempresa)
-
 @router.get("/rubro/{id_rubro}", response_model=list[schemas.MicroempresaResponse])
 def listar_microempresas_por_rubro(id_rubro: int, db: Session = Depends(get_db)):
     return service.listar_microempresas_por_rubro(db, id_rubro)
 
-@router.get("/activas", response_model=list[schemas.MicroempresaResponse])
-def listar_microempresas_activas(db: Session = Depends(get_db)):
-    return service.listar_microempresas(db, solo_activas=True)
-
-@router.patch("/{id_microempresa}/activar", response_model=schemas.MicroempresaResponse)
-def activar_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
-    return service.activar_microempresa(db, id_microempresa)
-
-@router.patch("/{id_microempresa}/desactivar", response_model=schemas.MicroempresaResponse)
-def desactivar_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
-    return service.desactivar_microempresa(db, id_microempresa)
-
-@router.patch("/{id_microempresa}/logo", response_model=schemas.MicroempresaResponse)
-def subir_logo_microempresa(id_microempresa: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    return service.subir_logo_microempresa(db, id_microempresa, file)
+@router.get("/total", response_model=dict)
+def total_microempresas(db: Session = Depends(get_db)):
+    cantidad = db.query(service.models.Microempresa).count()
+    return {"cantidad": cantidad}
 
 @router.get("/total/activas", response_model=dict)
 def total_microempresas_activas(db: Session = Depends(get_db)):
-    cantidad = db.query(service.models.Microempresa).filter_by(estado=True).count()
+    cantidad = db.query(service.models.Microempresa).filter_by(activo=True).count()
     return {"cantidad": cantidad}
 
 @router.get("/total/inactivas", response_model=dict)
 def total_microempresas_inactivas(db: Session = Depends(get_db)):
-    cantidad = db.query(service.models.Microempresa).filter_by(estado=False).count()
+    cantidad = db.query(service.models.Microempresa).filter_by(activo=False).count()
     return {"cantidad": cantidad}
+
+
 
 # LISTAR (superadmin ve todas, admin y vendedor solo la suya)
 
@@ -140,7 +119,7 @@ def listar_microempresas_por_plan(id_plan: int, db: Session = Depends(get_db), u
 @router.get("/activas", response_model=list[schemas.MicroempresaResponse])
 def listar_microempresas_activas(db: Session = Depends(get_db), user=Depends(get_current_user)):
     rol = get_user_role(user, db)
-    query = db.query(service.models.Microempresa).filter_by(estado=True)
+    query = db.query(service.models.Microempresa).filter_by(activo=True)
     if rol == 'superadmin':
         return query.all()
     else:
@@ -150,7 +129,7 @@ def listar_microempresas_activas(db: Session = Depends(get_db), user=Depends(get
 @router.get("/inactivas", response_model=list[schemas.MicroempresaResponse])
 def listar_microempresas_inactivas(db: Session = Depends(get_db), user=Depends(get_current_user)):
     rol = get_user_role(user, db)
-    query = db.query(service.models.Microempresa).filter_by(estado=False)
+    query = db.query(service.models.Microempresa).filter_by(activo=False)
     if rol == 'superadmin':
         return query.all()
     else:
@@ -162,7 +141,7 @@ def listar_microempresas_inactivas(db: Session = Depends(get_db), user=Depends(g
 # Ruta pública: Obtener microempresa por id (sin restricciones de autenticación ni autorización)
 @router.get("/{id_microempresa}", response_model=schemas.MicroempresaResponse)
 def obtener_microempresa(id_microempresa: int, db: Session = Depends(get_db)):
-    micro = db.query(service.models.Microempresa).filter_by(id_microempresa=id_microempresa, estado=True).first()
+    micro = db.query(service.models.Microempresa).filter_by(id_microempresa=id_microempresa).first()
     if not micro:
         raise HTTPException(status_code=404, detail="Microempresa no encontrada")
     return micro
@@ -183,11 +162,11 @@ def actualizar_microempresa(id_microempresa: int, data: schemas.MicroempresaUpda
 @router.delete("/{id_microempresa}")
 def eliminar_microempresa(id_microempresa: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     rol = get_user_role(user, db)
-    micro = db.query(service.models.Microempresa).filter_by(id_microempresa=id_microempresa, estado=True).first()
+    micro = db.query(service.models.Microempresa).filter_by(id_microempresa=id_microempresa, activo=True).first()
     if not micro:
         raise HTTPException(status_code=404, detail="Microempresa no encontrada")
     if rol == 'superadmin' or (rol == 'adminmicroempresa' and hasattr(user, 'admin_microempresa') and user.admin_microempresa and user.admin_microempresa.id_microempresa == id_microempresa):
-        micro.estado = False
+        micro.activo = False
         db.commit()
         return {"detail": "Microempresa dada de baja lógicamente"}
     else:
@@ -195,22 +174,7 @@ def eliminar_microempresa(id_microempresa: int, db: Session = Depends(get_db), u
     
 
 
-@router.get("/total", response_model=dict)
-def total_microempresas(db: Session = Depends(get_db)):
-    cantidad = db.query(service.models.Microempresa).count()
-    return {"cantidad": cantidad}
 
-
-@router.get("/total/activas", response_model=dict)
-def total_microempresas_activas(db: Session = Depends(get_db)):
-    cantidad = db.query(service.models.Microempresa).filter_by(estado=True).count()
-    return {"cantidad": cantidad}
-
-
-@router.get("/total/inactivas", response_model=dict)
-def total_microempresas_inactivas(db: Session = Depends(get_db)):
-    cantidad = db.query(service.models.Microempresa).filter_by(estado=False).count()
-    return {"cantidad": cantidad}
 
 
 # ACTIVAR microempresa (solo superadmin o admin de esa microempresa)
@@ -221,9 +185,9 @@ def activar_microempresa(id_microempresa: int, db: Session = Depends(get_db), us
     if not micro:
         raise HTTPException(status_code=404, detail="Microempresa no encontrada")
     if rol == 'superadmin' or (rol == 'adminmicroempresa' and hasattr(user, 'admin_microempresa') and user.admin_microempresa and user.admin_microempresa.id_microempresa == id_microempresa):
-        if micro.estado:
+        if micro.activo:
             return {"detail": "La microempresa ya está activa"}
-        micro.estado = True
+        micro.activo = True
         db.commit()
         return {"detail": "Microempresa activada correctamente"}
     else:
@@ -237,14 +201,18 @@ def desactivar_microempresa(id_microempresa: int, db: Session = Depends(get_db),
     if not micro:
         raise HTTPException(status_code=404, detail="Microempresa no encontrada")
     if rol == 'superadmin' or (rol == 'adminmicroempresa' and hasattr(user, 'admin_microempresa') and user.admin_microempresa and user.admin_microempresa.id_microempresa == id_microempresa):
-        if not micro.estado:
+        if not micro.activo:
             return {"detail": "La microempresa ya está inactiva"}
-        micro.estado = False
+        micro.activo = False
         db.commit()
         return {"detail": "Microempresa desactivada correctamente"}
     else:
         raise HTTPException(status_code=403, detail="No autorizado")
 
+
+@router.patch("/{id_microempresa}/logo", response_model=schemas.MicroempresaResponse)
+def subir_logo_microempresa(id_microempresa: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    return service.subir_logo_microempresa(db, id_microempresa, file)
 
 # ==================== ADMINISTRADORES DE MICROEMPRESA ====================
 @router.get("/{id_microempresa}/admins", response_model=list[UsuarioResponse])
