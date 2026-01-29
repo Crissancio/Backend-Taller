@@ -41,7 +41,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,      # Usamos la lista explícita sin asteriscos
+    allow_origins=["*"],      # Usamos la lista explícita sin asteriscos
     allow_credentials=True,     # Permitir cookies/tokens
     allow_methods=["*"],        # Permitir todos los métodos (GET, POST, etc.)
     allow_headers=["*"],        # Permitir todos los headers

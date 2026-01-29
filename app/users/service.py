@@ -1,3 +1,18 @@
+from .models import AdminMicroempresa, Vendedor
+
+def obtener_id_microempresa_por_usuario(db: Session, id_usuario: int, rol: str):
+    """Devuelve el id_microempresa para un usuario según su rol (adminmicroempresa o vendedor) usando ORM."""
+    if rol == "adminmicroempresa":
+        admin = db.query(AdminMicroempresa).filter_by(id_usuario=id_usuario).first()
+        if admin:
+            return admin.id_microempresa
+    elif rol == "vendedor":
+        vendedor = db.query(Vendedor).filter_by(id_usuario=id_usuario).first()
+        if vendedor:
+            return vendedor.id_microempresa
+    return None
+
+
 def eliminar_usuario(db: Session, id_usuario: int):
     from app.auth.base_user import Usuario
     usuario = db.query(Usuario).filter_by(id_usuario=id_usuario).first()

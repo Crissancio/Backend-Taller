@@ -17,15 +17,18 @@ from app.core.dependencies import get_user_role
 @router.get("/me", response_model=schemas.UsuarioResponse)
 def get_me(user=Depends(get_current_user), db: Session = Depends(get_db)):
     rol = get_user_role(user, db)
-    # Solo usar los roles canónicos
     if rol not in ["superadmin", "adminmicroempresa", "vendedor", "usuario"]:
         rol = "usuario"
+
+    id_microempresa = service.obtener_id_microempresa_por_usuario(db, user.id_usuario, rol)
+
     return {
         "id_usuario": user.id_usuario,
         "nombre": user.nombre,
         "email": user.email,
         "estado": user.estado,
-        "rol": rol
+        "rol": rol,
+        "id_microempresa": id_microempresa
     }
 
 # CRUD BÁSICO DE USUARIOS
@@ -56,12 +59,14 @@ def listar_usuarios(db: Session = Depends(get_db)):
         rol = get_user_role(user, db)
         if rol not in ["superadmin", "adminmicroempresa", "vendedor", "usuario"]:
             rol = "usuario"
+        id_microempresa = service.obtener_id_microempresa_por_usuario(db, user.id_usuario, rol)
         usuarios_con_rol.append({
             "id_usuario": user.id_usuario,
             "nombre": user.nombre,
             "email": user.email,
             "estado": user.estado,
-            "rol": rol
+            "rol": rol,
+            "id_microempresa": id_microempresa
         })
     return usuarios_con_rol
 
