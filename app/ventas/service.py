@@ -140,6 +140,19 @@ def crear_venta_presencial(db: Session, id_microempresa: int, venta: schemas.Ven
     # Calcular total automáticamente
     total = sum([d.cantidad * d.precio_unitario for d in venta.detalles])
     
+    # 1. Validar stock disponible ANTES de crear la venta
+    for det in venta.detalles:
+        stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
+        if not stock:
+            raise HTTPException(status_code=400, detail=f"No existe stock para el producto {det.id_producto}")
+        if stock.cantidad < det.cantidad:
+            producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Stock insuficiente para '{producto.nombre if producto else det.id_producto}'. Disponible: {stock.cantidad}, Solicitado: {det.cantidad}"
+            )
+    
+    # 2. Crear la venta
     db_venta = models.Venta(
         id_microempresa=id_microempresa,
         id_cliente=venta.id_cliente,
@@ -149,11 +162,12 @@ def crear_venta_presencial(db: Session, id_microempresa: int, venta: schemas.Ven
         fecha=datetime.now()
     )
     db.add(db_venta)
-    db.commit()
-    db.refresh(db_venta)
-    # Crear detalles y descontar stock
-    from app.notificaciones import service as notif_service
+    db.flush()  # Obtener id_venta sin hacer commit aún
+    
+    # 3. Crear detalles y descontar stock (todo en la misma transacción)
+    productos_con_alerta = []  # Para notificaciones después
     for det in venta.detalles:
+        # Crear detalle
         db_det = models.DetalleVenta(
             id_venta=db_venta.id_venta,
             id_producto=det.id_producto,
@@ -162,16 +176,60 @@ def crear_venta_presencial(db: Session, id_microempresa: int, venta: schemas.Ven
             subtotal=det.cantidad * det.precio_unitario
         )
         db.add(db_det)
+        
+        # Descontar stock
+        stock = db.query(Stock).filter(Stock.id_producto == det.id_producto).first()
+        stock.cantidad -= det.cantidad
+        stock.ultima_actualizacion = datetime.now()
+        
+        # Guardar info para notificaciones (después del commit)
+        producto = db.query(Producto).filter(Producto.id_producto == det.id_producto).first()
+        if stock.cantidad == 0:
+            productos_con_alerta.append(("STOCK_AGOTADO", producto.nombre, producto.id_producto, stock.cantidad, stock.stock_minimo))
+        elif stock.cantidad <= stock.stock_minimo:
+            productos_con_alerta.append(("STOCK_BAJO", producto.nombre, producto.id_producto, stock.cantidad, stock.stock_minimo))
+    
+    # 4. COMMIT de la venta y descuento de stock
     db.commit()
     db.refresh(db_venta)
-    # Evento de venta pagada
-    notif_service.generar_evento(
-        tipo_evento="VENTA_REALIZADA",
-        mensaje=f"Venta presencial pagada (ID: {db_venta.id_venta}) por un total de {db_venta.total}.",
-        id_microempresa=id_microempresa,
-        referencia_id=db_venta.id_venta,
-        db=db
-    )
+    
+    # 5. Generar notificaciones DESPUÉS del commit (sin afectar la transacción principal)
+    from app.notificaciones import service as notif_service
+    
+    # Notificaciones de stock
+    for tipo_alerta, nombre_producto, id_producto, cantidad_actual, stock_minimo in productos_con_alerta:
+        try:
+            if tipo_alerta == "STOCK_AGOTADO":
+                notif_service.generar_evento(
+                    tipo_evento="STOCK_AGOTADO",
+                    mensaje=f"El producto '{nombre_producto}' se ha agotado (stock=0)",
+                    id_microempresa=id_microempresa,
+                    referencia_id=id_producto,
+                    db=db
+                )
+            else:
+                notif_service.generar_evento(
+                    tipo_evento="STOCK_BAJO",
+                    mensaje=f"El producto '{nombre_producto}' está bajo el stock mínimo ({cantidad_actual}/{stock_minimo}).",
+                    id_microempresa=id_microempresa,
+                    referencia_id=id_producto,
+                    db=db
+                )
+        except Exception as e:
+            print(f"[Ventas] Error al generar notificación de stock: {e}")
+    
+    # Notificación de venta realizada
+    try:
+        notif_service.generar_evento(
+            tipo_evento="VENTA_REALIZADA",
+            mensaje=f"Venta presencial pagada (ID: {db_venta.id_venta}) por un total de Bs. {db_venta.total}.",
+            id_microempresa=id_microempresa,
+            referencia_id=db_venta.id_venta,
+            db=db
+        )
+    except Exception as e:
+        print(f"[Ventas] Error al generar notificación de venta: {e}")
+    
     return db_venta
 
 def crear_venta_online(db: Session, venta: schemas.VentaCreate, cliente_data: dict):

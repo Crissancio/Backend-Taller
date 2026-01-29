@@ -210,6 +210,81 @@ def actualizar_producto(id_producto: int, producto: schemas.ProductoUpdate, db: 
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     return result
 
+# Endpoint para actualizar producto con imagen (FormData)
+@router.put("/{id_producto}/con-imagen", response_model=schemas.ProductoResponse)
+def actualizar_producto_con_imagen(
+    id_producto: int,
+    nombre: str = Form(...),
+    descripcion: Optional[str] = Form(""),
+    precio_venta: float = Form(...),
+    costo_compra: Optional[float] = Form(0),
+    codigo: Optional[str] = Form(""),
+    estado: Optional[str] = Form("true"),  # Recibir como string y parsear
+    id_categoria: int = Form(...),
+    imagen: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db)
+):
+    print(f"[DEBUG] Actualizando producto {id_producto}")
+    print(f"[DEBUG] imagen recibida: {imagen}")
+    print(f"[DEBUG] estado recibido: {estado} (tipo: {type(estado)})")
+    
+    # Parsear estado de string a bool
+    estado_bool = estado.lower() in ("true", "1", "yes") if estado else True
+    print(f"[DEBUG] estado_bool: {estado_bool}")
+    
+    # Buscar producto existente
+    producto_existente = db.query(service.models.Producto).filter(
+        service.models.Producto.id_producto == id_producto
+    ).first()
+    if not producto_existente:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    
+    # Procesar imagen si se envía una nueva
+    imagen_path = producto_existente.imagen  # Mantener la imagen actual por defecto
+    if imagen and imagen.filename:
+        import os
+        from uuid import uuid4
+        ext = os.path.splitext(imagen.filename)[1]
+        filename = f"{uuid4().hex}{ext}"
+        os.makedirs(os.path.join("public", "productos"), exist_ok=True)
+        save_path = os.path.join("public", "productos", filename)
+        print(f"[DEBUG] Guardando imagen en: {save_path}")
+        with open(save_path, "wb") as f:
+            content = imagen.file.read()
+            f.write(content)
+            print(f"[DEBUG] Imagen guardada: {len(content)} bytes")
+        imagen_path = f"/public/productos/{filename}"
+        print(f"[DEBUG] imagen_path actualizado: {imagen_path}")
+    
+    # Actualizar campos
+    producto_existente.nombre = nombre
+    producto_existente.descripcion = descripcion
+    producto_existente.precio_venta = precio_venta
+    producto_existente.costo_compra = costo_compra
+    producto_existente.codigo = codigo
+    producto_existente.estado = estado_bool  # Usar el bool parseado
+    producto_existente.id_categoria = id_categoria
+    producto_existente.imagen = imagen_path
+    
+    db.commit()
+    db.refresh(producto_existente)
+    print(f"[DEBUG] Producto actualizado exitosamente")
+    return producto_existente
+    
+    # Actualizar campos
+    producto_existente.nombre = nombre
+    producto_existente.descripcion = descripcion
+    producto_existente.precio_venta = precio_venta
+    producto_existente.costo_compra = costo_compra
+    producto_existente.codigo = codigo
+    producto_existente.estado = estado
+    producto_existente.id_categoria = id_categoria
+    producto_existente.imagen = imagen_path
+    
+    db.commit()
+    db.refresh(producto_existente)
+    return producto_existente
+
 @router.delete("/{id_producto}", response_model=schemas.ProductoResponse)
 def eliminar_producto_fisico(id_producto: int, db: Session = Depends(get_db)):
     result = service.eliminar_producto_fisico(db, id_producto)
